@@ -4,91 +4,101 @@ import dns.dnssec
 import dns.message
 import dns.resolver
 import dns.rdatatype
+import dns.enum
 import pandas as pd
 import csv
 import tldextract
 from tqdm import tqdm
+from collections import deque
 
+
+root_ds_list = ['19036 8 2 49AAC11D7B6F6446702E54A1607371607A1A41855200FD2CE1CDDE32F24E8FB5', 
+                '20326 8 2 E06D44B80B8F1D39A95C0B0D7C65D08458E880409BBC683457104237C7F8EC8D']
 
 def split(domain):
+    # Root
     chain = list()
     chain.append('.')
-
+    
+    # TLD
     ext = tldextract.extract(domain)
     current = ext.suffix
-    chain.append(current)
+    if current != '':
+        chain.append(current)
 
-    current = '.'.join([ext.domain, current])
-    chain.append(current)
+    # Domain + TLD
+    if ext.domain != '':
+        current = '.'.join([ext.domain, current])
+        chain.append(current)
 
     # append subdomains
     subdomains = ext.subdomain.split('.')
     subdomains.reverse()
     for sub in subdomains:
+        if sub == '':
+            continue
         current = '.'.join([sub, current])
         chain.append(current)
 
-    chain.reverse()
-    return chain
+    return deque(chain)
 
 
-def get_ns(domain):
-    google_ns_addr = '8.8.8.8'
-    request = dns.message.make_query(domain, dns.rdatatype.NS)
-    response = dns.query.udp(request, google_ns_addr)
+def filter(answer, rd_type):
+    for rrset in answer:
+        if rrset.rdtype == rd_type:
+            return rrset
+    raise Exception(f'{rd_type} not found in answer')
+
+
+def query(domain, record_type, ns_addr = '8.8.8.8', want_dnssec=False):
+    request = dns.message.make_query(domain, record_type, want_dnssec=want_dnssec)
+    response = dns.query.udp(request, ns_addr, timeout=5.0)
     if response.rcode() != 0:
-        raise Exception(f'[get_ns] Query-error {dns.rcode.to_text(response.rcode())}')
-    return response.answer[0][0].to_text()
+        raise Exception(f'[query] {dns.rcode.to_text(response.rcode())}')
+    return response.answer
 
 
-def get_A(domain):
-    google_ns_addr = '8.8.8.8'
-    request = dns.message.make_query(domain, dns.rdatatype.A)
-    response = dns.query.udp(request, google_ns_addr)
-    if response.rcode() != 0:
-        raise Exception(f'[get_A] Query-error {dns.rcode.to_text(response.rcode())}')
-    return response.answer[0][0].to_text()
+def query_ns(domain):
+    answer = query(domain, dns.rdatatype.NS)
+    return filter(answer, dns.rdatatype.NS)
 
 
-def get_ns_addr(domain):
-    return get_A(get_ns(domain))
+def query_A(domain):
+    answer = query(domain, dns.rdatatype.A)
+    return filter(answer, dns.rdatatype.A)
 
 
-def unbox(answer):
-    # Order answer in rrsig and rrset
-    if answer[0].rdtype == dns.rdatatype.RRSIG:
-        rrsig, rrset = answer
-    elif answer[1].rdtype == dns.rdatatype.RRSIG:
-        rrset, rrsig = answer
-    else:
-        raise Exception('[unbox] ERROR: None of the answers contains an RRSIG')
-    return rrset, rrsig
+def query_cname(domain):
+    answer = query(domain, dns.rdatatype.CNAME)
+    return filter(answer, dns.rdatatype.CNAME)
+
+
+def get_ns_addrs(domain):
+    ns_addrs = []
+    for ns in query_ns(domain):
+        ns_addrs.append(query_A(ns.to_text())[0].to_text())
+    if not ns_addrs:
+        raise Exception('[get_ns_addrs] No ns_addrs found')
+    return ns_addrs    
 
 
 def get_dnskey(domain):
-    ns_addr = get_ns_addr(domain)
-    # Get DNSKEY for zone.
-    request = dns.message.make_query(domain, dns.rdatatype.DNSKEY, want_dnssec=True)
-    response = dns.query.udp(request, ns_addr, timeout=5.0)                             
-    if response.rcode() != 0:
-        raise Exception(f'[get_dnskey] Query-error {dns.rcode.to_text(response.rcode())}')
-    if len(response.answer) != 2:
-        raise Exception(f'[get_dnskey] Query-error: Query returned {len(response.answer)} results')
-    return unbox(response.answer)
+    ns_addrs = get_ns_addrs(domain)
+    answer = query(domain, dns.rdatatype.DNSKEY, ns_addrs[0], True)
+    if len(answer) < 2:
+        raise Exception(f'[get_dnskey] Query-error: Query returned an insufficient amount of results')
+    return filter(answer, dns.rdatatype.DNSKEY), filter(answer, dns.rdatatype.RRSIG)
 
 
 def get_ds(zone, parent_zone):
-    ns_addr = get_ns_addr(parent_zone)
-    request = dns.message.make_query(zone, dns.rdatatype.DS, want_dnssec=True)
-    response = dns.query.udp(request, ns_addr, timeout=5.0)
-    if response.rcode() != 0:
-        raise Exception(f'[get_ds] Query-error {dns.rcode.to_text(response.rcode())}')
-    if len(response.answer) != 2:
-        raise Exception(f'[get_ds] Query-error: Query returned {len(response.answer)} results')
-    return unbox(response.answer)
+    ns_addrs = get_ns_addrs(parent_zone)
+    answer = query(zone, dns.rdatatype.DS, ns_addrs[0], True)
+    if len(answer) < 2:
+        raise Exception(f'[get_ds] Query-error: Query returned an insufficient amount of results')
+    return filter(answer, dns.rdatatype.DS), filter(answer, dns.rdatatype.RRSIG)
 
 
-def get_digest(digest):
+def select_digest(digest):
     if dns.dnssec._is_sha1(digest):
         return dns.dnssec.DSDigest.SHA1
     elif dns.dnssec._is_sha256(digest):
@@ -99,13 +109,25 @@ def get_digest(digest):
         raise Exception('Digest not supported')
 
 
-def validate_ds(domain, dnskey, ds):
-    created_ds = dns.dnssec.make_ds(domain, dnskey, get_digest(ds.algorithm))
-    return created_ds == ds
+def validate_ds(domain, dnskey_set, ds_set):
+    for dnskey in dnskey_set:
+        for ds in ds_set:
+            created_ds = dns.dnssec.make_ds(domain, dnskey, select_digest(ds.algorithm))
+            if created_ds == ds:
+                return True
+    return False
 
 
 def validate_rrsigset(rrset, rrsig, domain, keys=None):
     if keys == None:
         keys = rrset
     name = dns.name.from_text(domain)
-    dns.dnssec.validate(rrset, rrsig, {name: keys})
+    try:
+        dns.dnssec.validate(rrset, rrsig, {name: keys})
+    except Exception as e:
+        return False
+    return True
+
+
+def get_root_ds():
+    dns.dnssec
