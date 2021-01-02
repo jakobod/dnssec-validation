@@ -2,8 +2,8 @@
 Some python scripts for verifying the chain of trust for a given domain
 
 
-# steps for the validation of the chain for www.example.com.
-
+###### steps for the validation of the chain for www.example.com.
+```sh
 Request: www.example.com A (DO) -> example.com.
 Answer:  www.example.com <A> + RRSIG(<A>) <- 
    
@@ -17,3 +17,4 @@ Answer:  example.com <DS> + RRSIG(<DS>) <-
 DNSKEY is used to create RRSIG(<DS>) and required to validate it
 Request: com DNSKEY (DO) -> com.
 Answer:  com <DNSKEY> + RRSIG(<DNSKEY>) <-
+```
