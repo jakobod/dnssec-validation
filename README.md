@@ -18,3 +18,15 @@ DNSKEY is used to create RRSIG(<DS>) and required to validate it
 Request: com DNSKEY (DO) -> com.
 Answer:  com <DNSKEY> + RRSIG(<DNSKEY>) <-
 ```
+
+
+# TODO
+
+- distinguish between 'not deployed', 'deployed + not validated', and 'deployed + validated', maybe more?
+- Cache already validated zones + their keys 
+- 
+
+
+# Links for reference
+- https://www.cloudflare.com/dns/dnssec/how-dnssec-works/
+- https://github.com/prateekroy/CSE534/blob/master/HW1/dnssec.py

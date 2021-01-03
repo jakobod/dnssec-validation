@@ -4,11 +4,7 @@ import dns.dnssec
 import dns.message
 import dns.resolver
 import dns.rdatatype
-import dns.enum
-import pandas as pd
-import csv
 import tldextract
-from tqdm import tqdm
 from collections import deque
 
 
@@ -44,7 +40,7 @@ def get_rrset(answer, rd_type):
     for rrset in answer:
         if rrset.rdtype == rd_type:
             return rrset
-    raise Exception(f'{rd_type} not found in answer')
+    raise Exception(f'{dns.rdatatype.to_text(rd_type)} not found in answer')
 
 
 def query(domain, record_type, ns_addr='8.8.8.8', want_dnssec=False):
@@ -53,22 +49,22 @@ def query(domain, record_type, ns_addr='8.8.8.8', want_dnssec=False):
     response = dns.query.udp(request, ns_addr, timeout=5.0)
     if response.rcode() != 0:
         raise Exception(f'[query] {dns.rcode.to_text(response.rcode())}')
-    return response.answer
+    return response
 
 
 def query_ns(domain):
-    answer = query(domain, dns.rdatatype.NS)
-    return get_rrset(answer, dns.rdatatype.NS)
+    response = query(domain, dns.rdatatype.NS)
+    return get_rrset(response.answer, dns.rdatatype.NS)
 
 
 def query_A(domain):
-    answer = query(domain, dns.rdatatype.A)
-    return get_rrset(answer, dns.rdatatype.A)
+    response = query(domain, dns.rdatatype.A)
+    return get_rrset(response.answer, dns.rdatatype.A)
 
 
 def query_cname(domain):
-    answer = query(domain, dns.rdatatype.CNAME)
-    return get_rrset(answer, dns.rdatatype.CNAME)
+    response = query(domain, dns.rdatatype.CNAME)
+    return get_rrset(response.answer, dns.rdatatype.CNAME)
 
 
 def query_ns_addrs(domain):
@@ -82,14 +78,14 @@ def query_ns_addrs(domain):
 
 def query_dnskey(domain):
     ns_addrs = query_ns_addrs(domain)
-    answer = query(domain, dns.rdatatype.DNSKEY, ns_addrs[0], True)
-    return get_rrset(answer, dns.rdatatype.DNSKEY), get_rrset(answer, dns.rdatatype.RRSIG)
+    response = query(domain, dns.rdatatype.DNSKEY, ns_addrs[0], True)
+    return get_rrset(response.answer, dns.rdatatype.DNSKEY), get_rrset(response.answer, dns.rdatatype.RRSIG)
 
 
 def query_ds(zone, parent_zone):
     ns_addrs = query_ns_addrs(parent_zone)
-    answer = query(zone, dns.rdatatype.DS, ns_addrs[0], True)
-    return get_rrset(answer, dns.rdatatype.DS), get_rrset(answer, dns.rdatatype.RRSIG)
+    response = query(zone, dns.rdatatype.DS, ns_addrs[0], True)
+    return get_rrset(response.answer, dns.rdatatype.DS), get_rrset(response.answer, dns.rdatatype.RRSIG)
 
 
 def select_digest(digest):
