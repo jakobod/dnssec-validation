@@ -20,13 +20,17 @@ def main(num_domains):
             for i, domain in enumerate(alexa_df['domain']):
                 try:
                     dnssec.validate_chain(domain)
+                    print(f'{domain} VALIDATED')
                     writer.writerow([domain, 'VALIDATED'])
                     validated += 1
                 except RecordMissingError as e:
+                    print(f'{domain} UNSECURED')
                     writer.writerow([domain, 'UNSECURED'])
                 except dns.exception.Timeout as e:
+                    print(f'{domain} TIMEOUT')
                     writer.writerow([domain, 'TIMEOUT'])
                 except QueryError as e:
+                    print(f'{domain} e')
                     writer.writerow([domain, e])
                 except Exception as e:
                     print(f'{type(e)}: {e}')
@@ -36,12 +40,12 @@ def main(num_domains):
                     csvfile.flush()
             print(f'validated {validated} of {len(alexa_df)} domains')
 
+
 if __name__ == '__main__':
     try:
-        dnssec.validate_chain('www.haspa.de')
-        # t1 = time.time()
-        # main(1000)
-        # t2 = time.time()
-        # print(f'validating took {t2-t1}s')
+        t1 = time.time()
+        main(1000)
+        t2 = time.time()
+        print(f'validating took {t2-t1}s')
     except Exception as e:
         print(f'{type(e)}: {e}')

@@ -24,8 +24,8 @@ Answer:  com <DNSKEY> + RRSIG(<DNSKEY>) <-
 
 - distinguish between 'not deployed', 'deployed + not validated', and 'deployed + validated', maybe more?
 - Fix caching of validated domains
-    - Add domains only to validated set if complete chain could be validated!
-- validate chain downwards
+    - Add domains to validated only set if complete chain could be validated!
+- Validate chain downwards
 - Find domain list containing also subdomains -> longer chains.
 
 ##### For the presentation
