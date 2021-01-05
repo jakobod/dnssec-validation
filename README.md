@@ -23,8 +23,9 @@ Answer:  com <DNSKEY> + RRSIG(<DNSKEY>) <-
 # TODO
 
 - distinguish between 'not deployed', 'deployed + not validated', and 'deployed + validated', maybe more?
-- Cache already validated zones + their keys 
-- validate chain upwards or downwards?!
+- Fix caching of validated domains
+    - Add domains only to validated set if complete chain could be validated!
+- validate chain downwards
 - Find domain list containing also subdomains -> longer chains.
 
 ##### For the presentation

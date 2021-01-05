@@ -6,7 +6,11 @@ import dns.resolver
 import dns.rdatatype
 import tldextract
 from collections import deque
+from collections import namedtuple
 from exception import *
+
+
+validated_zones = set()
 
 
 def split(domain):
@@ -109,8 +113,6 @@ def validate_zsk(domain, zsk_set, ds_set):
     for ds in ds_set:
         zsk_ds = dns.dnssec.make_ds(domain, get_zsk(
             zsk_set), ds.digest_type)
-        print(f'DS = {type(ds)}: {ds}')
-        print(f'ZSK_DS = {type(zsk_ds)}: {zsk_ds}')
         if ds == zsk_ds:
             return
     raise ZSKValidationError(domain)
@@ -145,14 +147,26 @@ def validate_chain(domain):
     first = splits.pop()
     while len(splits) > 0:
         second = splits.pop()
+        # Check if zone has been validated before
+        if first in validated_zones:
+            print(f'{first} already validated')
+            return
         # Validate
         dnskey_rrset, dnskey_rrsig = query_dnskey(first)
         validate_rrsigset(dnskey_rrset, dnskey_rrsig, first)
 
         ds_rrset, ds_rrsig = query_ds(first, second)
         validate_zsk(first, dnskey_rrset, ds_rrset)
+        validated_zones.add(first)
+        print(f'{first} added to validated zones')
         first = second
+
+    if first in validated_zones:
+        print(f'{first} already validated')
+        return
 
     dnskey_rrset, dnskey_rrsig = query_dnskey(first)
     validate_rrsigset(dnskey_rrset, dnskey_rrsig, first)
     validate_root_zsk(dnskey_rrset)
+    validated_zones.add(first)
+    print(f'{first} added to validated zones')

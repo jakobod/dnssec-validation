@@ -8,11 +8,7 @@ class NotFoundError(Exception):
 
 class ZSKValidationError(Exception):
     pass
-
-
-class RRSETValidationError(Exception):
-    pass
-
+  
 
 class QueryError(Exception):
     pass
