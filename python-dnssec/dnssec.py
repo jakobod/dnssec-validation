@@ -76,12 +76,15 @@ def get_from(response, rd_type):
 def query(name, record_type, ns_addr='8.8.8.8'):
     request = dns.message.make_query(
         name, record_type, want_dnssec=True)
-    response = dns.query.udp(request, ns_addr, timeout=1.0)
+    response, tcp_used = dns.query.udp_with_fallback(
+        request, ns_addr, timeout=10)
     if response.rcode() != 0:
         raise QueryError(f'{dns.rcode.to_text(response.rcode())}')
     rrset = get_from(response, record_type)
     rrsig = get_from(response, dns.rdatatype.RRSIG)
     if rrset is None:
+        raise RecordMissingError(f'Could not resolve {record_type}')
+    if rrsig is None:
         raise RecordMissingError(f'Could not resolve {record_type}')
     return Response(rrset, rrsig, record_type)
 

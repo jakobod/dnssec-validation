@@ -12,9 +12,9 @@ from exception import QueryError
 
 def main():
     t1 = time.time()
-    pool = ThreadPool(128)
+    pool = ThreadPool(512)
     alexa_df = pd.read_csv(
-        '../datasets/alexa-top1m-2021-01-04_0900_UTC.csv.tar.gz', sep=',', index_col=0, names=['domain'])
+        '../datasets/alexa-top1m-2021-01-04_0900_UTC.csv.tar.gz', sep=',', index_col=0, names=['domain'])[:-1]
     domains = alexa_df['domain'].values
     results = set()
     for val in tqdm(pool.imap_unordered(dnssec.validate_chain, domains), total=len(domains)):
