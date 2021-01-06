@@ -190,7 +190,7 @@ def validate_chain(domain):
     except QueryError as e:
         return ValidationResult(domain, f'QUERY_ERROR: {e}', num_validated_zones)
     except dns.dnssec.ValidationFailure as e:
-        return ValidationResult(domain, f'')
+        return ValidationResult(domain, f'Validation_FAILURE: {e}', num_validated_zones)
     except Exception as e:
         return ValidationResult(domain, 'OTHER', num_validated_zones)
     return ValidationResult(domain, 'VALIDATED', num_validated_zones)
