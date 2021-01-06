@@ -5,6 +5,9 @@ import dns.message
 import dns.resolver
 import dns.rdatatype
 import tldextract
+import time
+import threading
+
 from collections import deque
 from collections import namedtuple
 from exception import *
@@ -12,7 +15,20 @@ from exception import *
 
 Response = namedtuple('SignedResponse', 'rrset rrsig, type')
 Zone = namedtuple('Zone', 'name dnskey ds ns')
+ValidationResult = namedtuple(
+    'ValidationResult', 'name validation_state num_validated')
 validated_zones = dict()
+lock = threading.Lock()
+
+
+def get_from_dict(zone):
+    val = None
+    lock.acquire()
+    try:
+        val = validated_zones.get(zone)
+    finally:
+        lock.release()
+    return val
 
 
 def get_parent_zone(zone):
@@ -145,21 +161,39 @@ def validate_zone(zone_name, parent_zone):
     return zone
 
 
-def validate_chain(zone):
-    zones = split(zone)
+def validate_chain(domain):
+    zones = split(domain)
+    num_validated_zones = 0
 
-    # Root zone
-    zone_name = zones.popleft()
-    zone = validated_zones.get(zone_name)
-    if zone is None:
-        zone = validate_root_zone()
-        validated_zones[zone.name] = zone
-
-    while zones:
-        # Save values from last run!
-        parent_zone = zone
+    try:
+        # Root zone
         zone_name = zones.popleft()
-        zone = validated_zones.get(zone_name)
+        zone = get_from_dict(domain)
         if zone is None:
-            zone = validate_zone(zone_name, parent_zone)
+            zone = validate_root_zone()
             validated_zones[zone.name] = zone
+        num_validated_zones += 1
+
+        while zones:
+            # Save values from last run!
+            parent_zone = zone
+            zone_name = zones.popleft()
+            zone = get_from_dict(zone_name)
+            if zone is None:
+                zone = validate_zone(zone_name, parent_zone)
+                validated_zones[zone.name] = zone
+            num_validated_zones += 1
+    except RecordMissingError as e:
+        print(f'{domain} UNSECURED')
+        return ValidationResult(domain, 'UNSECURED', num_validated_zones)
+    except dns.exception.Timeout as e:
+        print(f'{domain} TIMEOUT')
+        return ValidationResult(domain, 'TIMEOUT', num_validated_zones)
+    except QueryError as e:
+        print(f'{domain} {e}')
+        return ValidationResult(domain, e, num_validated_zones)
+    except Exception as e:
+        print(f'{type(e)}: {e}')
+        return ValidationResult(domain, 'OTHER', num_validated_zones)
+    print(f'Validated {domain} @ {time.time()}')
+    return ValidationResult(domain, 'VALIDATED', num_validated_zones)
