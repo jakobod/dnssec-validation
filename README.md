@@ -26,7 +26,7 @@ Answer:  com <DNSKEY> + RRSIG(<DNSKEY>) <-
 - Fix caching of validated domains
     - Add domains to validated only set if complete chain could be validated!
 - Validate chain downwards
-- Find domain list containing also subdomains -> longer chains.
+- Find a domain list that contains subdomains too -> longer chains.
 
 ##### For the presentation
 

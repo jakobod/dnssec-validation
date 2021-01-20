@@ -1,4 +1,4 @@
-class RecordMissingError(Exception):
+class DNSKeyMissingError(Exception):
     pass
 
 
@@ -8,7 +8,7 @@ class NotFoundError(Exception):
 
 class ZSKValidationError(Exception):
     pass
-  
+
 
 class QueryError(Exception):
     pass

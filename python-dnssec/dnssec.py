@@ -13,22 +13,11 @@ from collections import namedtuple
 from exception import *
 
 
-Response = namedtuple('SignedResponse', 'rrset rrsig, type')
+Response = namedtuple('Response', 'rrset rrsig, type')
 Zone = namedtuple('Zone', 'name dnskey ds ns')
 ValidationResult = namedtuple(
     'ValidationResult', 'name validation_state num_validated')
 validated_zones = dict()
-lock = threading.Lock()
-
-
-def get_from_dict(zone):
-    val = None
-    lock.acquire()
-    try:
-        val = validated_zones.get(zone)
-    finally:
-        lock.release()
-    return val
 
 
 def get_parent_zone(zone):
@@ -45,7 +34,8 @@ def split(domain):
     chain.append('.')
 
     # TLD
-    ext = tldextract.extract(domain)
+    ext = tldextract.extract(domain, include_psl_private_domains=False)
+    print(ext)
     current = ext.suffix + '.'
     if current != '':
         chain.append(current)
@@ -63,11 +53,29 @@ def split(domain):
             continue
         current = '.'.join([sub, current])
         chain.append(current)
+    print(chain)
     return deque(chain)
+    # chain = domain.split('.')
+    # if chain[-1] != '':
+    #     chain.append('')
+    # res = []
+    # while len(chain) > 0:
+    #     joined = '.'.join(chain)
+    #     res.append(joined)
+    #     chain = chain[1:]
+    # res[-1] = '.'
+    # res.reverse()
+    # return deque(res)
 
 
 def get_from(response, rd_type):
     for ans in response.answer:
+        if ans.rdtype == rd_type:
+            return ans
+    for ans in response.authority:
+        if ans.rdtype == rd_type:
+            return ans
+    for ans in response.additional:
         if ans.rdtype == rd_type:
             return ans
     return None
@@ -76,24 +84,12 @@ def get_from(response, rd_type):
 def query(name, record_type, ns_addr='8.8.8.8'):
     request = dns.message.make_query(
         name, record_type, want_dnssec=True)
-    response, tcp_used = dns.query.udp_with_fallback(
-        request, ns_addr, timeout=10)
+    response, _ = dns.query.udp_with_fallback(request, ns_addr, timeout=10)
     if response.rcode() != 0:
         raise QueryError(f'{dns.rcode.to_text(response.rcode())}')
-    rrset = get_from(response, record_type)
-    rrsig = get_from(response, dns.rdatatype.RRSIG)
-    if rrset is None:
-        raise RecordMissingError(f'Could not resolve {record_type}')
-    if rrsig is None:
-        raise RecordMissingError(f'Could not resolve {record_type}')
-    return Response(rrset, rrsig, record_type)
-
-
-# TODO: This can be made more robust by querying all possible NS records
-def query_ns_addr(domain):
-    response = query(domain, dns.rdatatype.NS)
-    response = query(response.rrset[0].to_text(), dns.rdatatype.A)
-    return response.rrset[0].to_text()
+    return Response(get_from(response, record_type),
+                    get_from(response, dns.rdatatype.RRSIG),
+                    record_type)
 
 
 def validate_zsk(domain, zsk_set, ds_set):
@@ -128,36 +124,59 @@ def validate_root_zsk(dnskey_set):
     raise ZSKValidationError('.')
 
 
-def validate_rrsigset(rrset, rrsig, domain, key):
+def validate_rrsigset(rrset, rrsig, zone, key):
+    # if rrset is None:
+    #     raise EmptyError('empty rrset')
+    # if rrsig is None:
+    #     raise EmptyError('empty rrsig')
+    # if zone is None:
+    #     raise EmptyError('empty zone')
+    # if key is None:
+    #     raise EmptyError('empty key')
     try:
-        dns.dnssec.validate(rrset, rrsig, {dns.name.from_text(domain): key})
+        dns.dnssec.validate(rrset, rrsig, {dns.name.from_text(zone): key})
     except Exception as e:
-        raise dns.dnssec.ValidationFailure(f'{e}: {domain}')
+        raise dns.dnssec.ValidationFailure(f'{e}: {zone}')
 
 
 def validate_root_zone():
-    zone_name = '.'
-    ns_addr = query_ns_addr(zone_name)
-    dnskey = query(zone_name, dns.rdatatype.DNSKEY, ns_addr)
-    zone = Zone(zone_name, dnskey, None, ns_addr)
+    print('.')
+    ns_name = query('.', dns.rdatatype.NS)
+    ns_addr = query(ns_name.rrset[0].to_text(), dns.rdatatype.A)
+    ns = ns_addr.rrset[0].to_text()
+    dnskey = query('.', dns.rdatatype.DNSKEY, ns)
+    if dnskey.rrset is None:
+        raise DNSKeyMissingError('.')
+    zone = Zone('.', dnskey, None, ns)
 
     # Validate
     validate_rrsigset(
-        dnskey.rrset, dnskey.rrsig, zone_name, dnskey.rrset)
+        dnskey.rrset, dnskey.rrsig, '.', dnskey.rrset)
+    validate_rrsigset(
+        ns_name.rrset, ns_name.rrsig, '.', dnskey.rrset)
     validate_root_zsk(dnskey.rrset)
     return zone
 
 
 def validate_zone(zone_name, parent_zone):
+    print(zone_name)
     # Query all necessary parts
-    ns = query_ns_addr(zone_name)
+    ns_name = query(zone_name, dns.rdatatype.NS)
+    ns_addr = query(ns_name.rrset[0].to_text(), dns.rdatatype.A)
+    ns = ns_addr.rrset[0].to_text()
     dnskey = query(zone_name, dns.rdatatype.DNSKEY, ns)
+    if dnskey.rrset is None:
+        raise DNSKeyMissingError(zone_name)
     ds = query(zone_name, dns.rdatatype.DS, parent_zone.ns)
     zone = Zone(zone_name, dnskey, ds, ns)
+
+    print(zone)
 
     # Validate
     validate_rrsigset(
         zone.dnskey.rrset, zone.dnskey.rrsig, zone.name, zone.dnskey.rrset)
+    validate_rrsigset(ns_name.rrset, ns_name.rrsig,
+                      zone.name, zone.dnskey.rrset)
     validate_rrsigset(
         zone.ds.rrset, zone.ds.rrsig, parent_zone.name, parent_zone.dnskey.rrset)
     validate_zsk(zone.name, zone.dnskey.rrset, zone.ds.rrset)
@@ -171,7 +190,8 @@ def validate_chain(domain):
     try:
         # Root zone
         zone_name = zones.popleft()
-        zone = get_from_dict(domain)
+        print(zone_name)
+        zone = validated_zones.get(domain)
         if zone is None:
             zone = validate_root_zone()
             validated_zones[zone.name] = zone
@@ -181,12 +201,12 @@ def validate_chain(domain):
             # Save values from last run!
             parent_zone = zone
             zone_name = zones.popleft()
-            zone = get_from_dict(zone_name)
+            zone = validated_zones.get(zone_name)
             if zone is None:
                 zone = validate_zone(zone_name, parent_zone)
                 validated_zones[zone.name] = zone
             num_validated_zones += 1
-    except RecordMissingError as e:
+    except DNSKeyMissingError as e:
         return ValidationResult(domain, 'UNSECURED', num_validated_zones)
     except dns.exception.Timeout as e:
         return ValidationResult(domain, 'TIMEOUT', num_validated_zones)
@@ -195,5 +215,7 @@ def validate_chain(domain):
     except dns.dnssec.ValidationFailure as e:
         return ValidationResult(domain, f'Validation_FAILURE: {e}', num_validated_zones)
     except Exception as e:
+        print(domain, ':', type(e), e)
         return ValidationResult(domain, 'OTHER', num_validated_zones)
+
     return ValidationResult(domain, 'VALIDATED', num_validated_zones)
