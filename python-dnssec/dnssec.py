@@ -36,6 +36,7 @@ def split(domain):
 
 
 def get_from(response, rd_type):
+    # TODO: This should return a list of all answers!
     for section in [response.answer, response.authority, response.additional]:
         for ans in section:
             if ans.rdtype == rd_type:
@@ -56,6 +57,7 @@ def query(name, record_type, ns_addr='8.8.8.8'):
 
 
 def dnssec_deployed(zone, parent_zone):
+    # TODO: Figure out how to check for existance of DS of child zone.
     print('checking', zone)
     nsec = query(zone, dns.rdatatype.NSEC3, parent_zone.ns)
     print(nsec.rrset)
