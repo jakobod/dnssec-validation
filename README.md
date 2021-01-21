@@ -26,9 +26,13 @@ e.g. DNSKEY from NS + DS from parent NS
 - distinguish between 'not deployed', 'deployed + not validated', and 'deployed + validated', maybe more?
 - Find a domain list that contains subdomains too -> longer chains.
 
-##### For the presentation
+##### What is the question that I am trying to answer?
+- Is DNSSEC standard conforming if it is deployed?
+    - Using KSK and ZSK?
+- How many TLDs deploy DNSSEC?
+- 
 
-- What is the question that I am trying to answer?
+
 
 
 # Links for reference
