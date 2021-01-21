@@ -1,31 +1,29 @@
 # dnssec-validation
 Some python scripts for verifying the chain of trust for a given domain
 
+# Validation of zones
+These steps are conducted when a zone should be validated:
 
-###### steps for the validation of the chain for www.example.com.
+1. Check the existence of the zone.
 ```sh
-Request: www.example.com A (DO) -> example.com.
-Answer:  www.example.com <A> + RRSIG(<A>) <- 
-   
-Request: example.com DNSKEY (DO) -> example.com.
-Answer:  example.com <DNSKEY> + RRSIG(<DNSKEY>) <-
-
-DS (Delegation signer) contains the hashed DNSKEY from child (example.com)
-Request: example.com DS (DO) -> com.
-Answer:  example.com <DS> + RRSIG(<DS>) <-
-
-DNSKEY is used to create RRSIG(<DS>) and required to validate it
-Request: com DNSKEY (DO) -> com.
-Answer:  com <DNSKEY> + RRSIG(<DNSKEY>) <-
+QUERY SOA -> check the correctness of the response. e.g. is the SOA response intended for the queried Zone?
+```
+2. Query the authoritative NS for the zone.
+```
+e.g. QUERY NS -> QUERY A for NS
 ```
 
+3. QUERY DNSKEY and DS
+```sh
+e.g. DNSKEY from NS + DS from parent NS
+```
+
+4. VALIDATE...
+5. Repeat until the leaf-zone has been reached
 
 # TODO
 
 - distinguish between 'not deployed', 'deployed + not validated', and 'deployed + validated', maybe more?
-- Fix caching of validated domains
-    - Add domains to validated only set if complete chain could be validated!
-- Validate chain downwards
 - Find a domain list that contains subdomains too -> longer chains.
 
 ##### For the presentation
