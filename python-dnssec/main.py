@@ -69,7 +69,7 @@ if __name__ == '__main__':
     elif args.test_split:
         test_split(args.test_split)
     else:
-        pool = ThreadPool(8)
+        pool = ThreadPool(1)
         alexa_df = pd.read_csv(
             '../datasets/alexa-top1m-2021-01-04_0900_UTC.csv.tar.gz', sep=',', index_col=0, names=['domain'])[:-1]
         with open(args.output, 'w', newline='') as csvfile:
@@ -78,7 +78,8 @@ if __name__ == '__main__':
                 ['domain', 'validation_state', 'num_validated_zones'])
             domains = alexa_df['domain'].values
             dnssec.validate_root_zone()
-            for res in tqdm(pool.imap_unordered(dnssec.validate_chain, domains), total=len(domains)):
+            for i, res in enumerate(tqdm(pool.imap_unordered(dnssec.validate_chain, domains), total=len(domains))):
                 writer.writerow(
                     [res.name, res.validation_state, res.num_validated])
-                csvfile.flush()
+                if i % 100:
+                    csvfile.flush()

@@ -33,14 +33,18 @@ class ValidationResult:
     name: str
     validation_state: str
     num_validated: int
+    reason: str
 
 
+existing_zones = dict()
 validated_zones = dict()
 root_zone = None
 
 
 def is_valid_zone(zone):
     soa = query(zone, dns.rdatatype.SOA)
+    if soa.rrset is None:
+        raise RessourceMissingError(f'{zone} - SOA')
     return soa.rrset.name.to_text() == zone, soa
 
 
@@ -51,9 +55,15 @@ def split(domain):
     res = []
     while len(splits) > 0:
         joined = '.'.join(splits)
-        is_valid, soa = is_valid_zone(joined)
-        if is_valid:
-            res.append(Zone(joined, None, None, soa))
+        zone = existing_zones.get(joined)
+        if zone:
+            res.append(zone)
+        else:
+            is_valid, soa = is_valid_zone(joined)
+            if is_valid:
+                zone = Zone(joined, None, None, soa)
+                existing_zones[joined] = zone
+                res.append(zone)
         splits = splits[1:]
     res.reverse()
     return deque(res)
@@ -76,7 +86,7 @@ def raw_query(zone, record_type, ns_addr='8.8.8.8'):
             request, ns_addr, timeout=10)
     except dns.exception.Timeout:
         raise TimeoutError(
-            f'Querying {dns.rdatatype.to_text(record_type)} for {name} FAILED')
+            f'Querying {dns.rdatatype.to_text(record_type)}@{zone}')
     if response.rcode() != 0:
         raise QueryError(f'{dns.rcode.to_text(response.rcode())}')
     return response
@@ -88,6 +98,28 @@ def query(zone, record_type, ns_addr='8.8.8.8'):
                     get_from(response, dns.rdatatype.RRSIG, record_type))
 
 
+def validate_NSEC3(zone, parent_zone, nsec):
+    validate_rrsigset(nsec.rrset, nsec.rrsig, parent_zone.name,
+                      parent_zone.dnskey.rrset)
+    nsec3 = nsec.rrset[0]
+    hashed_name = dns.dnssec.nsec3_hash(
+        zone.name, nsec3.salt, nsec3.iterations, nsec3.algorithm)
+    parts = nsec.rrset.name.to_text().split('.')
+    if parts[0].upper() != hashed_name:
+        raise DNSSECNotDeployedError('NSEC3')
+    else:
+        raise ShouldNotHappenError('NSEC3 did not cover zone......')
+
+
+def validate_NSEC(zone, parent_zone, nsec):
+    validate_rrsigset(nsec.rrset, nsec.rrsig, parent_zone.name,
+                      parent_zone.dnskey.rrset)
+    if nsec.rrset.name.to_text() == zone.name:
+        raise DNSSECNotDeployedError('NSEC')
+    else:
+        raise ShouldNotHappenError('NSEC did not cover zone......')
+
+
 def query_DS(zone, parent_zone):
     dnskey = query(zone.name, dns.rdatatype.DS, parent_zone.ns)
     if dnskey.rrset:
@@ -96,14 +128,13 @@ def query_DS(zone, parent_zone):
     response = raw_query(zone.name, dns.rdatatype.DS, parent_zone.ns)
     nsec = Response(get_from(response, dns.rdatatype.NSEC3),
                     get_from(response, dns.rdatatype.RRSIG, dns.rdatatype.NSEC3))
-    validate_rrsigset(nsec.rrset, nsec.rrsig, parent_zone.name,
-                      parent_zone.dnskey.rrset)
-    nsec3 = nsec.rrset[0]
-    hashed_name = dns.dnssec.nsec3_hash(
-        zone.name, nsec3.salt, nsec3.iterations, nsec3.algorithm)
-    parts = nsec.rrset.name.to_text().split('.')
-    if parts[0].upper() != hashed_name:
-        raise DNSSECNotDeployedError()
+    if nsec.rrsig:
+        validate_NSEC3(zone, parent_zone, nsec)
+    else:
+        # NSEC used.. This is definitely NOT Standard conforming..
+        nsec = Response(get_from(response, dns.rdatatype.NSEC),
+                        get_from(response, dns.rdatatype.RRSIG, dns.rdatatype.NSEC))
+        validate_NSEC(zone, parent_zone, nsec)
 
 
 def validate_zsk(domain, zsk_set, ds_set):
@@ -135,6 +166,10 @@ def validate_root_zsk(dnskey_set):
 
 
 def validate_rrsigset(rrset, rrsig, zone, key):
+    if rrset is None:
+        raise EmptyError('RRSET is None')
+    if rrsig is None:
+        raise EmptyError('RRSIG is None')
     try:
         dns.dnssec.validate(rrset, rrsig, {dns.name.from_text(zone): key})
     except Exception as e:
@@ -158,9 +193,13 @@ def validate_root_zone():
 
 def validate_zone(zone, parent_zone):
     ns_addr = query(zone.soa.rrset[0].mname.to_text(), dns.rdatatype.A)
+    if ns_addr is None:
+        raise RessourceMissingError(f'{zone} - NS A record')
     zone.ns = ns_addr.rrset[0].to_text()
     ds = query_DS(zone, parent_zone)
     zone.dnskey = query(zone.name, dns.rdatatype.DNSKEY, zone.ns)
+    if zone.dnskey.rrset is None:
+        raise RessourceMissingError(f'{zone} - DNSKEY')
 
     validate_rrsigset(
         zone.dnskey.rrset, zone.dnskey.rrsig, zone.name, zone.dnskey.rrset)
@@ -173,9 +212,9 @@ def validate_zone(zone, parent_zone):
 
 
 def validate_chain(domain):
-    zones = split(domain)
     num_validated_zones = 1
     try:
+        zones = split(domain)
         parent_zone = root_zone
         while zones:
             # Save values from last run!
@@ -187,19 +226,20 @@ def validate_chain(domain):
             num_validated_zones += 1
             parent_zone = validated_zone
     except DNSSECNotDeployedError as e:
-        return ValidationResult(domain, 'UNSECURED', num_validated_zones)
+        return ValidationResult(domain, 'UNSECURED', num_validated_zones, str(e))
     except TimeoutError as e:
-        return ValidationResult(domain, f'TIMEOUT {e}', num_validated_zones)
+        return ValidationResult(domain, f'TIMEOUT', num_validated_zones, str(e))
     except QueryError as e:
-        return ValidationResult(domain, f'QUERY_ERROR: {e}', num_validated_zones)
+        return ValidationResult(domain, f'QUERY_ERROR', num_validated_zones, str(e))
     except dns.dnssec.ValidationFailure as e:
-        return ValidationResult(domain, f'Validation_FAILURE: {e}', num_validated_zones)
+        return ValidationResult(domain, f'VALIDATION_FAILURE', num_validated_zones, str(e))
     except ZSKValidationError as e:
-        return ValidationResult(domain, f'ZSK_VALIDATION_FAILED: {e}', num_validated_zones)
+        return ValidationResult(domain, f'ZSK_VALIDATION_FAILURE', num_validated_zones, str(e))
     except RessourceMissingError as e:
-        return ValidationResult(domain, f'MISSING_RESSOURCE: {e}', num_validated_zones)
+        return ValidationResult(domain, f'MISSING_RESSOURCE', num_validated_zones, str(e))
+    except ShouldNotHappenError as e:
+        return ValidationResult(domain, f'WEIRD_STUFF_HAPPENED', num_validated_zones, str(e))
     except Exception as e:
-        print(domain, ':', type(e), e)
-        return ValidationResult(domain, 'OTHER', num_validated_zones)
+        return ValidationResult(domain, f'OTHER', num_validated_zones, f'{type(e)}:{str(e)}')
 
-    return ValidationResult(domain, 'VALIDATED', num_validated_zones)
+    return ValidationResult(domain, 'VALIDATED', num_validated_zones, None)

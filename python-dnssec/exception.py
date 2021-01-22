@@ -20,3 +20,7 @@ class DNSSECNotDeployedError(Exception):
 
 class RessourceMissingError(Exception):
     pass
+
+
+class ShouldNotHappenError(Exception):
+    pass
