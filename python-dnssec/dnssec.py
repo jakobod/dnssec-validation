@@ -11,68 +11,99 @@ import threading
 from collections import deque
 from collections import namedtuple
 from exception import *
+from dataclasses import dataclass
 
 
-Response = namedtuple('Response', 'rrset rrsig, type')
-Zone = namedtuple('Zone', 'name dnskey ns')
-ValidationResult = namedtuple(
-    'ValidationResult', 'name validation_state num_validated')
+@dataclass
+class Response:
+    rrset: list  # dns.rrset.RRset
+    rrsig: list  # dns.rrset.RRset
+
+
+@dataclass
+class Zone:
+    name: str
+    dnskey: Response
+    ns: str
+    soa: Response
+
+
+@dataclass
+class ValidationResult:
+    name: str
+    validation_state: str
+    num_validated: int
+
+
 validated_zones = dict()
 root_zone = None
 
 
+def is_valid_zone(zone):
+    soa = query(zone, dns.rdatatype.SOA)
+    return soa.rrset.name.to_text() == zone, soa
+
+
 def split(domain):
-    chain = domain.split('.')
-    if chain[-1] != '':
-        chain.append('')
+    splits = domain.split('.')
+    if splits[-1] != '':
+        splits.append('')
     res = []
-    while len(chain) > 0:
-        joined = '.'.join(chain)
-        if is_valid_zone(joined):
-            res.append(joined)
-        chain = chain[1:]
+    while len(splits) > 0:
+        joined = '.'.join(splits)
+        is_valid, soa = is_valid_zone(joined)
+        if is_valid:
+            res.append(Zone(joined, None, None, soa))
+        splits = splits[1:]
     res.reverse()
     return deque(res)
 
 
-def get_from(response, rd_type):
+def get_from(response, rd_type, covers=dns.rdatatype.TYPE0):
     # TODO: This should return a list of all answers!
     for section in [response.answer, response.authority, response.additional]:
         for ans in section:
-            if ans.rdtype == rd_type:
+            if ans.rdtype == rd_type and ans.covers == covers:
                 return ans
     return None
 
 
-def query(name, record_type, ns_addr='8.8.8.8'):
+def raw_query(zone, record_type, ns_addr='8.8.8.8'):
     request = dns.message.make_query(
-        name, record_type, want_dnssec=True)
-    response, _ = dns.query.udp_with_fallback(
-        request, ns_addr, timeout=10)
+        zone, record_type, want_dnssec=True)
+    try:
+        response, _ = dns.query.udp_with_fallback(
+            request, ns_addr, timeout=10)
+    except dns.exception.Timeout:
+        raise TimeoutError(
+            f'Querying {dns.rdatatype.to_text(record_type)} for {name} FAILED')
     if response.rcode() != 0:
         raise QueryError(f'{dns.rcode.to_text(response.rcode())}')
+    return response
+
+
+def query(zone, record_type, ns_addr='8.8.8.8'):
+    response = raw_query(zone, record_type, ns_addr)
     return Response(get_from(response, record_type),
-                    get_from(response, dns.rdatatype.RRSIG),
-                    record_type)
+                    get_from(response, dns.rdatatype.RRSIG, record_type))
 
 
-def dnssec_deployed(zone, parent_zone):
-    # TODO: Figure out how to check for existance of DS of child zone.
-    print('checking', zone)
-    nsec = query(zone, dns.rdatatype.NSEC3, parent_zone.ns)
-    print(nsec.rrset)
+def query_DS(zone, parent_zone):
+    dnskey = query(zone.name, dns.rdatatype.DS, parent_zone.ns)
+    if dnskey.rrset:
+        return dnskey
+    # DS record seems to be nonexistent.. Prove that using NSEC3!
+    response = raw_query(zone.name, dns.rdatatype.DS, parent_zone.ns)
+    nsec = Response(get_from(response, dns.rdatatype.NSEC3),
+                    get_from(response, dns.rdatatype.RRSIG, dns.rdatatype.NSEC3))
+    validate_rrsigset(nsec.rrset, nsec.rrsig, parent_zone.name,
+                      parent_zone.dnskey.rrset)
     nsec3 = nsec.rrset[0]
     hashed_name = dns.dnssec.nsec3_hash(
-        zone, nsec3.salt, nsec3.iterations, nsec3.algorithm)
-    print(nsec.rrset.name.to_text().split('.')[0])
-    print(hashed_name)
-    # parts = nsec.rrset.name.to_text().split('.')
-    # return parts[0].upper() == hashed_name
-
-
-def is_valid_zone(zone):
-    soa = query(zone, dns.rdatatype.SOA)
-    return soa.rrset.name.to_text() == zone
+        zone.name, nsec3.salt, nsec3.iterations, nsec3.algorithm)
+    parts = nsec.rrset.name.to_text().split('.')
+    if parts[0].upper() != hashed_name:
+        raise DNSSECNotDeployedError()
 
 
 def validate_zsk(domain, zsk_set, ds_set):
@@ -115,8 +146,8 @@ def validate_root_zone():
     ns = '198.41.0.4'  # IP of a.root-servers.net. This doesn't have to be validated!
     dnskey = query('.', dns.rdatatype.DNSKEY, ns)
     if dnskey.rrset is None:
-        raise DNSKeyMissingError('.')
-    zone = Zone('.', dnskey, ns)
+        raise RessourceMissingError('. - DNSKEY')
+    zone = Zone('.', dnskey, ns, None)
 
     # Validate
     validate_rrsigset(
@@ -125,20 +156,15 @@ def validate_root_zone():
     root_zone = zone
 
 
-def validate_zone(zone_name, parent_zone):
-    # Query all necessary parts
-    soa = query(zone_name, dns.rdatatype.SOA)
-    ns_addr = query(soa.rrset[0].mname.to_text(), dns.rdatatype.A)
-    ns = ns_addr.rrset[0].to_text()
-    dnskey = query(zone_name, dns.rdatatype.DNSKEY, ns)
-    if dnskey.rrset is None:
-        raise DNSKeyMissingError(zone_name)
-    ds = query(zone_name, dns.rdatatype.DS, parent_zone.ns)
-    zone = Zone(zone_name, dnskey, ns)
+def validate_zone(zone, parent_zone):
+    ns_addr = query(zone.soa.rrset[0].mname.to_text(), dns.rdatatype.A)
+    zone.ns = ns_addr.rrset[0].to_text()
+    ds = query_DS(zone, parent_zone)
+    zone.dnskey = query(zone.name, dns.rdatatype.DNSKEY, zone.ns)
 
     validate_rrsigset(
         zone.dnskey.rrset, zone.dnskey.rrsig, zone.name, zone.dnskey.rrset)
-    validate_rrsigset(soa.rrset, soa.rrsig,
+    validate_rrsigset(zone.soa.rrset, zone.soa.rrsig,
                       zone.name, zone.dnskey.rrset)
     validate_rrsigset(ds.rrset, ds.rrsig, parent_zone.name,
                       parent_zone.dnskey.rrset)
@@ -153,23 +179,25 @@ def validate_chain(domain):
         parent_zone = root_zone
         while zones:
             # Save values from last run!
-            zone_name = zones.popleft()
-            zone = validated_zones.get(zone_name)
-            if zone is None:
-                zone = validate_zone(zone_name, parent_zone)
-                validated_zones[zone.name] = zone
+            zone = zones.popleft()
+            validated_zone = validated_zones.get(zone.name)
+            if validated_zone is None:
+                validated_zone = validate_zone(zone, parent_zone)
+                validated_zones[zone.name] = validated_zone
             num_validated_zones += 1
-            parent_zone = zone
-    except DNSKeyMissingError as e:
+            parent_zone = validated_zone
+    except DNSSECNotDeployedError as e:
         return ValidationResult(domain, 'UNSECURED', num_validated_zones)
-    except dns.exception.Timeout as e:
-        return ValidationResult(domain, 'TIMEOUT', num_validated_zones)
+    except TimeoutError as e:
+        return ValidationResult(domain, f'TIMEOUT {e}', num_validated_zones)
     except QueryError as e:
         return ValidationResult(domain, f'QUERY_ERROR: {e}', num_validated_zones)
     except dns.dnssec.ValidationFailure as e:
         return ValidationResult(domain, f'Validation_FAILURE: {e}', num_validated_zones)
     except ZSKValidationError as e:
         return ValidationResult(domain, f'ZSK_VALIDATION_FAILED: {e}', num_validated_zones)
+    except RessourceMissingError as e:
+        return ValidationResult(domain, f'MISSING_RESSOURCE: {e}', num_validated_zones)
     except Exception as e:
         print(domain, ':', type(e), e)
         return ValidationResult(domain, 'OTHER', num_validated_zones)

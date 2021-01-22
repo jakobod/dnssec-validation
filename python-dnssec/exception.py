@@ -1,11 +1,3 @@
-class DNSKeyMissingError(Exception):
-    pass
-
-
-class NotFoundError(Exception):
-    pass
-
-
 class ZSKValidationError(Exception):
     pass
 
@@ -15,4 +7,16 @@ class QueryError(Exception):
 
 
 class EmptyError(Exception):
+    pass
+
+
+class TimeoutError(Exception):
+    pass
+
+
+class DNSSECNotDeployedError(Exception):
+    pass
+
+
+class RessourceMissingError(Exception):
     pass

@@ -8,12 +8,23 @@ import dns
 
 from multiprocessing.dummy import Pool as ThreadPool
 from tqdm import tqdm
-from exception import *
 
 
 def nsec3(domain):
-    dnssec.dnssec_deployed(
-        'sina.com.cn', dnssec.Zone(None, None, '203.119.25.1'))
+    dnssec.validate_root_zone()
+    try:
+        if dnssec.query_DS(
+                dnssec.Zone('jakob-otto.de.', None, None, None),
+                dnssec.Zone('de.', None, '194.0.0.53', None)):
+            print('jakob-otto.de has DNSSEC deployed')
+    except Exception as e:
+        print(e)
+    try:
+        print(dnssec.query_DS(
+            dnssec.Zone('sina.com.cn.', None, None, None),
+            dnssec.Zone('com.cn.', None, '203.119.25.1', None)))
+    except Exception as e:
+        print(type(e), e)
 
 
 def test(domain):
@@ -23,12 +34,17 @@ def test(domain):
 
 def test_main(nrows):
     dnssec.validate_root_zone()
-    pool = ThreadPool(8)
     alexa_df = pd.read_csv(
         '../datasets/alexa-top1m-2021-01-04_0900_UTC.csv.tar.gz', sep=',', index_col=0, names=['domain'], nrows=nrows)[:-1]
     domains = alexa_df['domain'].values
     for domain in domains:
         print(dnssec.validate_chain(domain))
+
+
+def test_split(domain):
+    dnssec.validate_root_zone()
+    for zone in dnssec.split(domain):
+        print(zone)
 
 
 if __name__ == '__main__':
@@ -37,6 +53,8 @@ if __name__ == '__main__':
     parser.add_argument('--test', help='Domain to validate')
     parser.add_argument(
         '--test_main', help='Run the testmain', type=int)
+    parser.add_argument(
+        '--test_split', help='Test the split func', type=str)
     parser.add_argument('--nsec', help='Check NSEC3 for given domain')
     parser.add_argument(
         '--output', help='The output path to write the csv to', default='../output/out.csv')
@@ -48,6 +66,8 @@ if __name__ == '__main__':
         test(args.test)
     elif args.test_main:
         test_main(args.test_main)
+    elif args.test_split:
+        test_split(args.test_split)
     else:
         pool = ThreadPool(8)
         alexa_df = pd.read_csv(
