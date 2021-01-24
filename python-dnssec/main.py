@@ -30,6 +30,7 @@ def nsec3(domain):
 def test(domain):
     dnssec.validate_root_zone()
     print(dnssec.validate_chain(domain))
+    print(dnssec.validate_chain(domain))
 
 
 def test_main(nrows):

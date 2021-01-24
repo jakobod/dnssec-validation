@@ -36,16 +36,36 @@ class ValidationResult:
     reason: str
 
 
-existing_zones = dict()
-validated_zones = dict()
+# Contains zones for which the SOA record has been queried and was correct.
+existing_zones = dict()  # {str zone_name: Zone zone}
+# Contains zones for which the SOA record has been queried and was INcorrect.
+nonexisting_zones = set()  # str : zone_name
+
+# Contains zones that have been fully validated.
+validated_zones = dict()  # {str zone_name: Zone zone}
+# Contains zones that do not use DNSSEC (PROVEN using NSEC/3)
+invalidated_zones = dict()  # {str zone_name : str way_of_proving}
+
 root_zone = None
 
 
 def is_valid_zone(zone):
+    # Has this zone been checked before?
+    if zone in nonexisting_zones:
+        return False, None
+    if zone in existing_zones:
+        return True, existing_zones.get(zone)
+
+    # Has not been checked before. Check it!
     soa = query(zone, dns.rdatatype.SOA)
     if soa.rrset is None:
         raise RessourceMissingError(f'{zone} - SOA')
-    return soa.rrset.name.to_text() == zone, soa
+    exists = soa.rrset.name.to_text() == zone
+    if exists:
+        existing_zones[zone] = soa
+        return exists, soa
+    nonexisting_zones.add(zone)
+    return False, None
 
 
 def split(domain):
@@ -53,17 +73,11 @@ def split(domain):
     if splits[-1] != '':
         splits.append('')
     res = []
-    while len(splits) > 0:
+    while splits[0] != '':
         joined = '.'.join(splits)
-        zone = existing_zones.get(joined)
-        if zone:
-            res.append(zone)
-        else:
-            is_valid, soa = is_valid_zone(joined)
-            if is_valid:
-                zone = Zone(joined, None, None, soa)
-                existing_zones[joined] = zone
-                res.append(zone)
+        is_valid, soa = is_valid_zone(joined)
+        if is_valid:
+            res.append(Zone(joined, None, None, soa))
         splits = splits[1:]
     res.reverse()
     return deque(res)
@@ -106,6 +120,7 @@ def validate_NSEC3(zone, parent_zone, nsec):
         zone.name, nsec3.salt, nsec3.iterations, nsec3.algorithm)
     parts = nsec.rrset.name.to_text().split('.')
     if parts[0].upper() != hashed_name:
+        invalidated_zones[zone.name] = 'NSEC3'
         raise DNSSECNotDeployedError('NSEC3')
     else:
         raise ShouldNotHappenError('NSEC3 did not cover zone......')
@@ -115,12 +130,15 @@ def validate_NSEC(zone, parent_zone, nsec):
     validate_rrsigset(nsec.rrset, nsec.rrsig, parent_zone.name,
                       parent_zone.dnskey.rrset)
     if nsec.rrset.name.to_text() == zone.name:
+        invalidated_zones[zone.name] = 'NSEC'
         raise DNSSECNotDeployedError('NSEC')
     else:
         raise ShouldNotHappenError('NSEC did not cover zone......')
 
 
 def query_DS(zone, parent_zone):
+    if zone.name in invalidated_zones:
+        raise DNSSECNotDeployedError(invalidated_zones.get(zone.name))
     dnskey = query(zone.name, dns.rdatatype.DS, parent_zone.ns)
     if dnskey.rrset:
         return dnskey
