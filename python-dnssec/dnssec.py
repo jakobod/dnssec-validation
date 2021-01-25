@@ -56,7 +56,7 @@ def is_valid_zone(zone):
     # Has not been checked before. Check it!
     soa = query(zone, dns.rdatatype.SOA)
     if soa.rrset is None:
-        raise RessourceMissingError(f'{zone} - SOA')
+        raise RessourceMissingError(f'{zone.name} - SOA')
     exists = soa.rrset.name.to_text() == zone
     if exists:
         existing_zones[zone] = soa
@@ -89,6 +89,17 @@ def get_from(response, rd_type, covers=dns.rdatatype.TYPE0):
     return None
 
 
+def get_all_from(response, rd_type, covers=dns.rdatatype.TYPE0):
+    answers = []
+    for section in [response.answer, response.authority, response.additional]:
+        for ans in section:
+            if ans.rdtype == rd_type and ans.covers == covers:
+                answers.append(ans)
+    if len(answers) == 0:
+        return None
+    return answers
+
+
 def raw_query(zone, record_type, ns_addr='8.8.8.8'):
     request = dns.message.make_query(
         zone, record_type, want_dnssec=True)
@@ -109,47 +120,64 @@ def query(zone, record_type, ns_addr='8.8.8.8'):
                     get_from(response, dns.rdatatype.RRSIG, record_type))
 
 
-def validate_NSEC3(zone, parent_zone, nsec):
-    validate_rrsigset(nsec.rrset, nsec.rrsig, parent_zone.name,
+def validate_NSEC3(zone_name, parent_zone, rrset, rrsig):
+    validate_rrsigset(rrset, rrsig, parent_zone.name,
                       parent_zone.dnskey.rrset)
-    nsec3 = nsec.rrset[0]
+    nsec3 = rrset[0]
     hashed_name = dns.dnssec.nsec3_hash(
-        zone.name, nsec3.salt, nsec3.iterations, nsec3.algorithm)
-    parts = nsec.rrset.name.to_text().split('.')
+        zone_name, nsec3.salt, nsec3.iterations, nsec3.algorithm)
+    parts = rrset.name.to_text().split('.')
     if parts[0].upper() != hashed_name:
-        invalidated_zones[zone.name] = 'NSEC3'
-        raise DNSSECNotDeployedError('NSEC3')
+        return False
     else:
-        raise ShouldNotHappenError('NSEC3 did not cover zone......')
+        nsec3_str = nsec3.to_text()
+        if 'DS' in nsec3_str:
+            # In this case, something is VERY wrong.
+            # The record should have been contained in the response.
+            raise ShouldNotHappenError('NSEC3 proved existence of DS record')
+        return True
 
 
-def validate_NSEC(zone, parent_zone, nsec):
-    validate_rrsigset(nsec.rrset, nsec.rrsig, parent_zone.name,
+def validate_NSEC(zone_name, parent_zone, rrset, rrsig):
+    validate_rrsigset(rrset, rrsig, parent_zone.name,
                       parent_zone.dnskey.rrset)
-    if nsec.rrset.name.to_text() == zone.name:
-        invalidated_zones[zone.name] = 'NSEC'
-        raise DNSSECNotDeployedError('NSEC')
+    if rrset.name.to_text() != zone_name:
+        return False
     else:
-        raise ShouldNotHappenError('NSEC did not cover zone......')
+        nsec_str = rrset[0].to_text()
+        if 'DS' in nsec_str:
+            # In this case, something is VERY wrong.
+            # The record should have been contained in the response.
+            raise ShouldNotHappenError('NSEC proved existence of DS record')
+        return True
 
 
 def query_DS(zone, parent_zone):
     if zone.name in invalidated_zones:
         raise DNSSECNotDeployedError(invalidated_zones.get(zone.name))
-    dnskey = query(zone.name, dns.rdatatype.DS, parent_zone.ns)
-    if dnskey.rrset:
-        return dnskey
-    # DS record seems to be nonexistent.. Prove that using NSEC3!
     response = raw_query(zone.name, dns.rdatatype.DS, parent_zone.ns)
-    nsec = Response(get_from(response, dns.rdatatype.NSEC3),
-                    get_from(response, dns.rdatatype.RRSIG, dns.rdatatype.NSEC3))
+    ds = Response(get_from(response, dns.rdatatype.DS),
+                  get_from(response, dns.rdatatype.RRSIG, dns.rdatatype.DS))
+    if ds.rrset:
+        return ds
+    # DS record seems to be nonexistent.. Prove that using NSEC3!
+    nsec = Response(get_all_from(response, dns.rdatatype.NSEC3),
+                    get_all_from(response, dns.rdatatype.RRSIG, dns.rdatatype.NSEC3))
     if nsec.rrsig:
-        validate_NSEC3(zone, parent_zone, nsec)
+        nsec_type = 'NSEC3'
+        for i in range(len(nsec.rrsig)):
+            if validate_NSEC3(zone.name, parent_zone, nsec.rrset[i], nsec.rrsig[i]):
+                break
     else:
         # NSEC used.. This is definitely NOT Standard conforming..
-        nsec = Response(get_from(response, dns.rdatatype.NSEC),
-                        get_from(response, dns.rdatatype.RRSIG, dns.rdatatype.NSEC))
-        validate_NSEC(zone, parent_zone, nsec)
+        nsec_type = 'NSEC'
+        nsec = Response(get_all_from(response, dns.rdatatype.NSEC),
+                        get_all_from(response, dns.rdatatype.RRSIG, dns.rdatatype.NSEC))
+        for i in range(len(nsec.rrset)):
+            if validate_NSEC(zone.name, parent_zone, nsec.rrset[i], nsec.rrsig[i]):
+                break
+    invalidated_zones[zone.name] = nsec_type
+    raise DNSSECNotDeployedError(nsec_type)
 
 
 def validate_zsk(domain, zsk_set, ds_set):
@@ -209,12 +237,12 @@ def validate_root_zone():
 def validate_zone(zone, parent_zone):
     ns_addr = query(zone.soa.rrset[0].mname.to_text(), dns.rdatatype.A)
     if ns_addr is None:
-        raise RessourceMissingError(f'{zone} - NS A record')
+        raise RessourceMissingError(f'{zone.name} - NS A record')
     zone.ns = ns_addr.rrset[0].to_text()
     ds = query_DS(zone, parent_zone)
     zone.dnskey = query(zone.name, dns.rdatatype.DNSKEY, zone.ns)
     if zone.dnskey.rrset is None:
-        raise RessourceMissingError(f'{zone} - DNSKEY')
+        raise RessourceMissingError(f'{zone.name} - DNSKEY')
 
     validate_rrsigset(
         zone.dnskey.rrset, zone.dnskey.rrsig, zone.name, zone.dnskey.rrset)
