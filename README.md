@@ -60,6 +60,18 @@ TDU124P7EGELLSS91RPV7H8S4DKOE2EH.com.cn. 21600 IN RRSIG	NSEC3 8 3 21600 20210220
 ;; MSG SIZE  rcvd: 758
 ```
 
+# Per zone Information
+```python
+@dataclass
+class ZoneInfo:
+    has_dnskey: bool
+    ds_in_parent_zone: bool
+    valid_key: bool
+    deployed_keys: list # Either 256 or 257 or both
+    validated: bool
+```
+
+
 
 # TODO
 
