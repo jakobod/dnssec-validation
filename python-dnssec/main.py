@@ -5,6 +5,7 @@ import csv
 import pandas as pd
 import argparse
 import dns
+import time
 
 from multiprocessing.dummy import Pool as ThreadPool
 from tqdm import tqdm
@@ -30,7 +31,22 @@ def nsec3(domain):
 def test(domain):
     dnssec.validate_root_zone()
     print(dnssec.validate_chain(domain))
-    print(dnssec.validate_chain(domain))
+
+
+def test_time(domains):
+    dnssec.validate_root_zone()
+    for domain in domains:
+        t1 = time.time()
+        print(dnssec.validate_chain(domain))
+        t2 = time.time()
+        print(f'validating without caches took: {t2-t1}')
+        mean = 0
+        for _ in range(5):
+            t2 = time.time()
+            print(dnssec.validate_chain(domain))
+            t3 = time.time()
+            mean += t3 - t2
+        print(f'validating with caches took: {mean/5}')
 
 
 def test_main(nrows):
@@ -51,7 +67,8 @@ def test_split(domain):
 if __name__ == '__main__':
     # , action='store_true' for boolean flags
     parser = argparse.ArgumentParser()
-    parser.add_argument('--test', help='Domain to validate')
+    parser.add_argument('--time', nargs='+', help='Domain(s) to validate')
+    parser.add_argument('--test', help='Domain(s) to validate')
     parser.add_argument(
         '--test_main', help='Run the testmain', type=int)
     parser.add_argument(
@@ -63,6 +80,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     if args.nsec:
         nsec3(args.nsec)
+    if args.time:
+        test_time(args.time)
     elif args.test:
         test(args.test)
     elif args.test_main:

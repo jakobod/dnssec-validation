@@ -70,7 +70,9 @@ TDU124P7EGELLSS91RPV7H8S4DKOE2EH.com.cn. 21600 IN RRSIG	NSEC3 8 3 21600 20210220
 - Is DNSSEC standard conforming if it is deployed?
     - Using KSK and ZSK?
 - How many TLDs deploy DNSSEC?
-- 
+- Is the chain broken?
+    - If so, does it continue in child-zones?
+    - Have a look at [DNSSEC lookaside validation](https://tools.ietf.org/html/rfc5074)!
 
 
 

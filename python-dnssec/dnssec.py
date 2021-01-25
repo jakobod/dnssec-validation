@@ -4,9 +4,6 @@ import dns.dnssec
 import dns.message
 import dns.resolver
 import dns.rdatatype
-import tldextract
-import time
-import threading
 
 from collections import deque
 from collections import namedtuple
