@@ -28,9 +28,11 @@ def nsec3(domain):
         print(type(e), e)
 
 
-def test(domain):
+def test(domains):
     dnssec.validate_root_zone()
-    print(dnssec.validate_chain(domain))
+    for domain in domains:
+        print('Checking:', domain)
+        print(dnssec.validate_chain(domain))
 
 
 def test_time(domains):
@@ -55,6 +57,7 @@ def test_main(nrows):
         '../datasets/alexa-top1m-2021-01-04_0900_UTC.csv.tar.gz', sep=',', index_col=0, names=['domain'], nrows=nrows)[:-1]
     domains = alexa_df['domain'].values
     for domain in domains:
+        print(domain)
         print(dnssec.validate_chain(domain))
 
 
@@ -68,7 +71,7 @@ if __name__ == '__main__':
     # , action='store_true' for boolean flags
     parser = argparse.ArgumentParser()
     parser.add_argument('--time', nargs='+', help='Domain(s) to validate')
-    parser.add_argument('--test', help='Domain(s) to validate')
+    parser.add_argument('--test', nargs='+', help='Domain(s) to validate')
     parser.add_argument(
         '--test_main', help='Run the testmain', type=int)
     parser.add_argument(
