@@ -30,6 +30,9 @@ class ValidationState:
             self.validation_state = 'OTHER'
             self.reason = f'{type(ex)}: {str(ex)}'
 
+    def _as_dict(self):
+        return {'validation_state': self.validation_state, 'reason': self.reason}
+
 
 class ZoneInfo(ValidationState):
     def __init__(self, name):
@@ -39,7 +42,8 @@ class ZoneInfo(ValidationState):
         self.has_ds = False
         self.valid_dnskey = False
         self.valid_soa = False
-        self.deployed_keys = []
+        self.num_ksk = 0
+        self.num_zsk = 0
         self.validated = False
 
     def __bool__(self):
@@ -47,14 +51,25 @@ class ZoneInfo(ValidationState):
                 self.has_ds and
                 self.valid_dnskey and
                 self.valid_soa and
-                len(self.deployed_keys) != 0 and
                 self.validated)
 
     def __str__(self):
-        return f"ZoneInfo(name='{self.name}', validation_state='{self.validation_state}', reason='{self.reason}', has_dnskey={self.has_dnskey}, has_ds={self.has_ds}, valid_dnskey={self.valid_dnskey}, valid_soa={self.valid_soa}, deployed_keys={self.deployed_keys}, validated={self.validated})"
+        return f"ZoneInfo(name='{self.name}', validation_state='{self.validation_state}', reason='{self.reason}', has_dnskey={self.has_dnskey}, has_ds={self.has_ds}, valid_dnskey={self.valid_dnskey}, valid_soa={self.valid_soa}, num_ksk={self.num_ksk}, num_zsk={self.num_zsk}, validated={self.validated})"
 
     def __repr__(self):
-        return f'ZoneInfo({self.name}, {self.validation_state}, {self.reason}, {self.has_dnskey}, {self.has_ds}, {self.valid_dnskey}, {self.valid_soa}, {self.deployed_keys}, {self.validated})'
+        return f'ZoneInfo({self.name}, {self.validation_state}, {self.reason}, {self.has_dnskey}, {self.has_ds}, {self.valid_dnskey}, {self.valid_soa}, {self.num_ksk}, {self.num_zsk}, {self.validated})'
+
+    def as_dict(self):
+        dct = {'name': self.name,
+               'has_dnskey': self.has_dnskey,
+               'has_ds': self.has_ds,
+               'valid_dnskey': self.valid_dnskey,
+               'valid_soa': self.valid_soa,
+               'num_ksk': self.num_ksk,
+               'num_zsk': self.num_zsk,
+               'validated': self.validated}
+        dct.update(super()._as_dict())
+        return dct
 
 
 class ValidationResult(ValidationState):
@@ -78,6 +93,15 @@ class ValidationResult(ValidationState):
 
     def __repr__(self):
         return f'ValidationResult({self.name}, {self.validation_state}, {self.reason}, {self.zones})'
+
+    def as_dict(self):
+        zone_dicts = []
+        for zone in self.zones:
+            zone_dicts.append(zone.as_dict())
+        dct = {'name': self.name}
+        dct.update(super()._as_dict())
+        dct['zones'] = zone_dicts
+        return dct
 
 
 @ dataclass

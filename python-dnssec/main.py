@@ -6,6 +6,7 @@ import pandas as pd
 import argparse
 import dns
 import time
+import json
 
 from multiprocessing.dummy import Pool as ThreadPool
 from tqdm import tqdm
@@ -29,6 +30,11 @@ def nsec3(domain):
 
 
 def test(domains):
+    with open('eggs.csv', newline='') as csvfile:
+        spamreader = csv.reader(csvfile, delimiter=' ', quotechar='|')
+        for row in spamreader:
+            print(', '.join(row))
+
     dnssec.validate_root_zone()
     for domain in domains:
         print('Checking:', domain)
@@ -56,9 +62,12 @@ def test_main(nrows):
     alexa_df = pd.read_csv(
         '../datasets/alexa-top1m-2021-01-04_0900_UTC.csv.tar.gz', sep=',', index_col=0, names=['domain'], nrows=nrows)[:-1]
     domains = alexa_df['domain'].values
-    for domain in domains:
-        print(domain)
-        print(dnssec.validate_chain(domain))
+    with open('data.json', 'w', encoding='utf-8') as json_file:
+        for domain in domains:
+            result = dnssec.validate_chain(domain)
+            print(result)
+            json.dump(result.as_dict(), json_file, ensure_ascii=False)
+            json_file.write('\n')
 
 
 def test_split(domain):

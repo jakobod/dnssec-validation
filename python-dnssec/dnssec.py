@@ -7,6 +7,7 @@ import dns.rdatatype
 import traceback
 
 from collections import deque
+from collections import defaultdict
 from exception import *
 from datatypes import *
 
@@ -211,13 +212,11 @@ def validate_root_zone():
     root_zone = zone
 
 
-def get_deployed_keys(dnskey_rrset):
-    keys = []
+def count_deployed_keys(dnskey_rrset):
+    counts = defaultdict(lambda: 0)
     for key in dnskey_rrset:
-        keys.append(key.flags)
-    if len(keys) > 0:
-        return sorted(keys)
-    return None
+        counts[key.flags] += 1
+    return counts[257], counts[256]
 
 
 def validate_zone(zone, parent_zone):
@@ -235,7 +234,8 @@ def validate_zone(zone, parent_zone):
         if zone_info.has_dnskey:
             zone_info.valid_dnskey = validate_rrsigset(
                 zone.dnskey.rrset, zone.dnskey.rrsig, zone.name, zone.dnskey.rrset)
-            zone_info.deployed_keys = get_deployed_keys(zone.dnskey.rrset)
+            zone_info.num_ksk, zone_info.num_zsk = count_deployed_keys(
+                zone.dnskey.rrset)
         if ds and parent_zone.dnskey.rrset:
             zone_info.valid_ds = validate_rrsigset(ds.rrset, ds.rrsig, parent_zone.name,
                                                    parent_zone.dnskey.rrset)
