@@ -1,26 +1,26 @@
 class ZSKValidationError(Exception):
-    pass
+  pass
 
 
 class QueryError(Exception):
-    pass
+  pass
 
 
 class EmptyError(Exception):
-    pass
+  pass
 
 
 class TimeoutError(Exception):
-    pass
+  pass
 
 
 class DNSSECNotDeployedError(Exception):
-    pass
+  pass
 
 
 class RessourceMissingError(Exception):
-    pass
+  pass
 
 
 class ShouldNotHappenError(Exception):
-    pass
+  pass
