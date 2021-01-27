@@ -22,7 +22,7 @@ def main():
   # , action='store_true' for boolean flags
   parser = argparse.ArgumentParser()
   parser.add_argument('--test', nargs='+', help='Domain(s) to validate')
-  parser.add_argument('input', help='The csv containing domains')
+  parser.add_argument('--input', help='The csv containing domains')
   parser.add_argument(
       '--output', help='The output path to write the csv to', default='../output/out.csv')
   args = parser.parse_args()
