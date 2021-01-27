@@ -17,6 +17,16 @@ probing --help
 evaluation --help
 ```
 
+## Importing the libraries
+All Libraries are prefixed with `dnssec`. Hence the correct way of including them is:
+```python
+# Import complete module dnssec 
+from dnssec.probing import dnssec
+
+# Import all classes from module
+from dnssec.probing.exception import *
+```
+
 ## Adding new dependencies
 The usual `requirements.txt` is not used in this project. All requirements for the library are contained in the `setup.py`, tagged `install_requires`.
 Development requirements are gathered in the `dev-requirements.in`.

@@ -5,7 +5,11 @@ import dns.message
 import dns.resolver
 import dns.rdatatype
 import traceback
+import argparse
+import json
+import csv
 
+from tqdm import tqdm
 from collections import deque
 from collections import defaultdict
 from dnssec.probing.exception import *
@@ -274,3 +278,37 @@ def validate_chain(domain):
   except Exception as e:
     current_validation.from_error(e)
   return current_validation
+
+
+def test(domains):
+  validate_root_zone()
+  for domain in domains:
+    print('Checking:', domain)
+    print(validate_chain(domain))
+
+
+def main():
+  # , action='store_true' for boolean flags
+  parser = argparse.ArgumentParser()
+  parser.add_argument('--test', nargs='+', help='Domain(s) to validate')
+  parser.add_argument('--input', help='The csv containing domains')
+  parser.add_argument(
+      '--output', help='The output path to write the csv to', default='../output/out.csv')
+  args = parser.parse_args()
+
+  if args.test:
+    test(args.test)
+  else:
+    validate_root_zone()
+    with open(args.input, 'r') as csv_file:
+      reader = csv.reader(csv_file)
+      with open(args.output, 'w', encoding='utf-8') as json_file:
+        for domain in tqdm(reader):
+          result = validate_chain(domain[1])
+          json.dump(result.as_dict(), json_file, ensure_ascii=False)
+          json_file.write('\n')
+          json_file.flush()
+
+
+if __name__ == '__main__':
+  main()

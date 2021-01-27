@@ -95,8 +95,10 @@ setup(
     },
     entry_points={
         "console_scripts": [
-            "probing = dnssec.probing.main:main",
-            "evaluation = dnssec.evaluation.json_test:main",
+            "probing = dnssec.probing.dnssec:main",
+            "json_test = dnssec.evaluation.json_test:main",
+            "evaluation = dnssec.evaluation.evaluation:main",
+
         ]
     },
 )
