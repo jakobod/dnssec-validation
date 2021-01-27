@@ -1,6 +1,26 @@
 # dnssec-validation
 Some python scripts for verifying the chain of trust for a given domain
 
+# How to use
+```sh
+# Create and activate python environment
+python3 -m venv envs
+source envs/bin/activate
+
+# Create and install the python libs
+make update
+```
+
+After that, the libraries should be built and linked into the virtual-env. They can be used like so:
+```sh
+probing --help
+evaluation --help
+```
+
+## Adding new dependencies
+The usual `requirements.txt` is not used in this project. All requirements for the library are contained in the `setup.py`, tagged `install_requires`.
+Development requirements are gathered in the `dev-requirements.in`.
+
 # Validation of zones
 These steps are conducted when a zone should be validated:
 
