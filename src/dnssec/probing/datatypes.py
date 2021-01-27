@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from exception import *
+from dnssec.probing.exception import *
 
 
 @dataclass

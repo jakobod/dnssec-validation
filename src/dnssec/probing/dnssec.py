@@ -8,8 +8,8 @@ import traceback
 
 from collections import deque
 from collections import defaultdict
-from exception import *
-from datatypes import *
+from dnssec.probing.exception import *
+from dnssec.probing.datatypes import *
 
 
 # Contains zones for which the SOA record has been queried and was correct.

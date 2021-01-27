@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 
-import dnssec
+from tqdm import tqdm
+from multiprocessing.dummy import Pool as ThreadPool
 import csv
 import pandas as pd
 import argparse
 import dns
 import time
 import json
-
-from multiprocessing.dummy import Pool as ThreadPool
-from tqdm import tqdm
+from dnssec.probing import dnssec
 
 
 def test(domains):
@@ -19,7 +18,7 @@ def test(domains):
     print(dnssec.validate_chain(domain))
 
 
-if __name__ == '__main__':
+def main():
   # , action='store_true' for boolean flags
   parser = argparse.ArgumentParser()
   parser.add_argument('--test', nargs='+', help='Domain(s) to validate')
@@ -40,3 +39,7 @@ if __name__ == '__main__':
           json.dump(result.as_dict(), json_file, ensure_ascii=False)
           json_file.write('\n')
           json_file.flush()
+
+
+if __name__ == '__main__':
+  main()
