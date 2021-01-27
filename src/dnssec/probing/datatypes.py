@@ -33,9 +33,13 @@ class ValidationState:
   def _as_dict(self):
     return {'validation_state': self.validation_state, 'reason': self.reason}
 
+  def _from_dict(self, dct):
+    self.validation_state = dct['validation_state']
+    self.reason = dct['reason']
+
 
 class ZoneInfo(ValidationState):
-  def __init__(self, name):
+  def __init__(self, name=None):
     super().__init__()
     self.name = name
     self.has_dnskey = False
@@ -71,9 +75,21 @@ class ZoneInfo(ValidationState):
     dct.update(super()._as_dict())
     return dct
 
+  def from_dict(self, dct):
+    super()._from_dict(dct)
+    self.name = dct['name']
+    self.has_dnskey = dct['has_dnskey']
+    self.has_ds = dct['has_ds']
+    self.valid_dnskey = dct['valid_dnskey']
+    self.valid_soa = dct['valid_soa']
+    self.num_ksk = dct['num_ksk']
+    self.num_zsk = dct['num_zsk']
+    self.validated = dct['validated']
+    return self
+
 
 class ValidationResult(ValidationState):
-  def __init__(self, name):
+  def __init__(self, name=None):
     super().__init__()
     self.name = name
     self.zones = []
@@ -102,6 +118,13 @@ class ValidationResult(ValidationState):
     dct.update(super()._as_dict())
     dct['zones'] = zone_dicts
     return dct
+
+  def from_dict(self, dct):
+    super()._from_dict(dct)
+    for zone_dct in dct['zones']:
+      self.zones.append(ZoneInfo().from_dict(zone_dct))
+    self.name = dct['name']
+    return self
 
 
 @ dataclass

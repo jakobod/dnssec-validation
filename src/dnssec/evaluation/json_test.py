@@ -10,10 +10,11 @@ def main():
   with open(file_path, 'r') as json_file:
     for i, line in enumerate(json_file):
 
-      json_obj = json.loads(line)
-      res = ValidationResult('blubb')
-      print(res)
-      break
+      dct = json.loads(line)
+      res = ValidationResult().from_dict(dct)
+      print(i, res)
+      if i > 10:
+        break
 
 
 if __name__ == '__main__':
