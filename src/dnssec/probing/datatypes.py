@@ -48,6 +48,7 @@ class ZoneInfo(ValidationState):
     self.valid_soa = False
     self.num_ksk = 0
     self.num_zsk = 0
+    self.key_algos = []
     self.validated = False
 
   def __bool__(self):
@@ -58,10 +59,10 @@ class ZoneInfo(ValidationState):
             self.validated)
 
   def __str__(self):
-    return f"ZoneInfo(name='{self.name}', validation_state='{self.validation_state}', reason='{self.reason}', has_dnskey={self.has_dnskey}, has_ds={self.has_ds}, valid_dnskey={self.valid_dnskey}, valid_soa={self.valid_soa}, num_ksk={self.num_ksk}, num_zsk={self.num_zsk}, validated={self.validated})"
+    return f"ZoneInfo(name='{self.name}', validation_state='{self.validation_state}', reason='{self.reason}', has_dnskey={self.has_dnskey}, has_ds={self.has_ds}, valid_dnskey={self.valid_dnskey}, valid_soa={self.valid_soa}, num_ksk={self.num_ksk}, num_zsk={self.num_zsk}, key_algos={self.key_algos}, validated={self.validated})"
 
   def __repr__(self):
-    return f'ZoneInfo({self.name}, {self.validation_state}, {self.reason}, {self.has_dnskey}, {self.has_ds}, {self.valid_dnskey}, {self.valid_soa}, {self.num_ksk}, {self.num_zsk}, {self.validated})'
+    return f'ZoneInfo({self.name}, {self.validation_state}, {self.reason}, {self.has_dnskey}, {self.has_ds}, {self.valid_dnskey}, {self.valid_soa}, {self.num_ksk}, {self.num_zsk}, {self.key_algos}, {self.validated})'
 
   def as_dict(self):
     dct = {'name': self.name,
@@ -71,6 +72,7 @@ class ZoneInfo(ValidationState):
            'valid_soa': self.valid_soa,
            'num_ksk': self.num_ksk,
            'num_zsk': self.num_zsk,
+           'key_algos': self.key_algos,
            'validated': self.validated}
     dct.update(super()._as_dict())
     return dct
@@ -84,6 +86,7 @@ class ZoneInfo(ValidationState):
     self.valid_soa = dct['valid_soa']
     self.num_ksk = dct['num_ksk']
     self.num_zsk = dct['num_zsk']
+    self.key_algos = dct['key_algos']
     self.validated = dct['validated']
     return self
 

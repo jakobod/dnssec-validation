@@ -216,11 +216,13 @@ def validate_root_zone():
   root_zone = zone
 
 
-def count_deployed_keys(dnskey_rrset):
+def parse_deployed_keys(dnskey_rrset):
+  algorithms = []
   counts = defaultdict(lambda: 0)
   for key in dnskey_rrset:
     counts[key.flags] += 1
-  return counts[257], counts[256]
+    algorithms.append(dns.dnssec.algorithm_to_text(key.algorithm))
+  return counts[257], counts[256], algorithms
 
 
 def validate_zone(zone, parent_zone):
@@ -238,7 +240,7 @@ def validate_zone(zone, parent_zone):
     if zone_info.has_dnskey:
       zone_info.valid_dnskey = validate_rrsigset(
           zone.dnskey.rrset, zone.dnskey.rrsig, zone.name, zone.dnskey.rrset)
-      zone_info.num_ksk, zone_info.num_zsk = count_deployed_keys(
+      zone_info.num_ksk, zone_info.num_zsk, zone_info.key_algos = parse_deployed_keys(
           zone.dnskey.rrset)
     if ds and parent_zone.dnskey.rrset:
       zone_info.valid_ds = validate_rrsigset(ds.rrset, ds.rrsig, parent_zone.name,
@@ -294,12 +296,18 @@ def main():
                       help='One or more domains to validate')
   parser.add_argument('--input', help='The csv containing domains')
   parser.add_argument(
-      '--output', help='The output path to write the csv to', default='../output/out.csv')
+      '--output', help='The output path to write the csv to')
   args = parser.parse_args()
 
   if args.test:
     test(args.test)
   else:
+    if not args.input:
+      print('An input HAS to be specified!')
+      exit(-1)
+    if not args.output:
+      print('An output HAS to be specified!')
+      exit(-1)
     validate_root_zone()
     with open(args.input, 'r') as csv_file:
       reader = csv.reader(csv_file)
