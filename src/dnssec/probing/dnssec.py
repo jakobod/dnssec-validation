@@ -86,19 +86,14 @@ def get_all_from(response, rd_type, covers=dns.rdatatype.TYPE0):
 def raw_query(zone, record_type, ns_addr='8.8.8.8'):
   request = dns.message.make_query(
       zone, record_type, want_dnssec=True)
-  for _ in range(3):  # Retry maximum 3 times
-    timeout = False
-    try:
-      response, _ = dns.query.udp_with_fallback(
-          request, ns_addr, timeout=3)
-    except dns.exception.Timeout:
-      continue
-    if response.rcode() != 0:
-      raise QueryError(
-          f'{dns.rdatatype.to_text(record_type)}: {dns.rcode.to_text(response.rcode())}')
-    return response
-  # this should only happen if the timeout happened 3 times!
-  raise TimeoutError(f'{dns.rdatatype.to_text(record_type)}')
+  try:
+    response, _ = dns.query.udp_with_fallback(
+        request, ns_addr, timeout=3)
+  except dns.exception.Timeout:
+    raise TimeoutError(dns.rdatatype.to_text(record_type))
+  if response.rcode() != 0:
+    raise QueryError(dns.rcode.to_text(response.rcode()))
+  return response
 
 
 def query(zone, record_type, ns_addr='8.8.8.8'):
