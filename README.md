@@ -25,7 +25,7 @@ from dnssec.probing import dnssec
 
 # Import all classes from module
 from dnssec.probing.exception import *
-```
+```
 
 ## Adding new dependencies
 The usual `requirements.txt` is not used in this project. All requirements for the library are contained in the `setup.py`, tagged `install_requires`.
@@ -99,6 +99,7 @@ TDU124P7EGELLSS91RPV7H8S4DKOE2EH.com.cn. 21600 IN RRSIG	NSEC3 8 3 21600 20210220
 ##### What is the question that I am trying to answer?
 - Is DNSSEC standard conforming if it is deployed?
     - Using KSK and ZSK?
+- Is NSEC or NSEC3 used?
 - How many TLDs deploy DNSSEC?
 - Is the chain broken?
     - If so, does it continue in child-zones?
