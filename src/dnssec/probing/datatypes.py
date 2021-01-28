@@ -37,6 +37,12 @@ class ValidationState:
     self.validation_state = dct['validation_state']
     self.reason = dct['reason']
 
+  def _as_list(self):
+    return [self.validation_state, self.reason]
+
+  def _member_names(self):
+    return ['validation_state', 'reason']
+
 
 class ZoneInfo(ValidationState):
   def __init__(self, name=None):
@@ -86,9 +92,19 @@ class ZoneInfo(ValidationState):
     self.valid_soa = dct['valid_soa']
     self.num_ksk = dct['num_ksk']
     self.num_zsk = dct['num_zsk']
-    # self.key_algos = dct['key_algos']
+    self.key_algos = dct['key_algos']
     self.validated = dct['validated']
     return self
+
+  def as_list(self):
+    return [self.name, self.has_dnskey, self.has_ds, self.valid_dnskey,
+            self.valid_soa, self.num_ksk, self.num_zsk, self.key_algos,
+            self.validated] + super()._as_list()
+
+  def member_names(self):
+    return [
+        'name', 'has_dnskey', 'has_ds', 'valid_dnskey', 'valid_soa',
+        'num_ksk', 'num_zsk', 'key_algos', 'validated'] + super()._member_names()
 
 
 class ValidationResult(ValidationState):
@@ -128,6 +144,12 @@ class ValidationResult(ValidationState):
       self.zones.append(ZoneInfo().from_dict(zone_dct))
     self.name = dct['name']
     return self
+
+  def as_list(self):
+    return [self.name] + super()._as_list()
+
+  def member_names(self):
+    return ['name'] + super()._member_names()
 
 
 @ dataclass
