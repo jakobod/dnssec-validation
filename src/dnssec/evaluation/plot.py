@@ -4,6 +4,16 @@
 import pandas as pd
 import argparse
 import matplotlib.pyplot as plt
+import matplotlib.colors as clrs
+import seaborn as sns
+import numpy as np
+
+
+# TODO
+# [] Plot used Algorithms and distinguish secure and unsecure ciphers.
+# [] Visualize trust chain
+# [] Plot NSEC usage
+
 
 algorithms = {'RSAMD5': 'MUST NOT',
               'DSA': 'MUST NOT',
@@ -24,31 +34,49 @@ def plot_errors(df, output_path):
   print(group)
 
 
+def plot_or_show(output_path, figure_name):
+  if output_path:
+    plt.savefig(output_path+figure_name,
+                bbox_inches='tight')
+  else:
+    plt.show()
+
+
+def plot_key_distribution(df, output_path):
+  counted_df = df.groupby(['num_ksk', 'num_zsk'], as_index=False).count()
+  counted_df.drop(counted_df.columns.difference(
+      ['num_ksk', 'num_zsk', 'name']), 1, inplace=True)
+  counted_df.columns = ['num_zsk', 'num_ksk', 'count']
+  counted_df = counted_df.drop(
+      counted_df[(counted_df['num_zsk'] == 0) & (counted_df['num_ksk'] == 0)].index)
+  counted_df.plot.scatter(x='num_ksk', y='num_zsk',
+                          c='count', colormap='viridis', marker='s', s=50**2,
+                          figsize=(10, 8), norm=clrs.LogNorm())
+  plt.xlabel('Number of KSK [#]')
+  plt.ylabel('Number of ZSK [#]')
+  plt.title('Distribution of keys', loc='left')
+  plot_or_show(output_path, 'key_distribution.pdf')
+
+
 def plot_deployment(df, output_path):
-  print(df)
   count_df = df.groupby('validation_state', as_index=False).count()
-  # count_df = count_df.drop(['name', 'is_flapping'], axis=1)
-  # count_df.columns = ['validation_state', 'count']
-  # count_df.sort_values(by='count', inplace=True, ascending=False)
-  print(count_df)
-
-  # plt.bar(x=count_df['validation_state'], height=count_df['count'])
-  # plt.xlabel('Result')
-  # plt.ylabel('Count [#]')
-  # plt.title('Results of DNSSEC validation', loc='left')
-  # plt.gcf().set_size_inches(12, 5)
-
-  # if output_path:
-  #   plt.savefig(output_path + 'dnssec_deployment.pdf',
-  #               bbox_inches='tight')
-  # else:
-  #   plt.show()
+  count_df = count_df.drop(['reason'], axis=1)
+  count_df.columns = ['validation_state', 'count']
+  count_df.sort_values(by='count', inplace=True, ascending=False)
+  plt.bar(x=count_df['validation_state'], height=count_df['count'])
+  plt.xlabel('Result')
+  plt.ylabel('Count [#]')
+  plt.title('Results of DNSSEC validation', loc='left')
+  plt.gcf().set_size_inches(12, 5)
+  plot_or_show(output_path, 'dnssec_deployment.pdf')
 
 
 def plot(input_path, output_path):
   all_domains_df = pd.read_csv(input_path+'all_domains.csv')
+  all_zones_df = pd.read_csv(input_path+'all_zones.csv')
+
   plot_deployment(all_domains_df, output_path)
-  # all_zones_df = pd.read_csv(input_path+'all_zones.csv')
+  plot_key_distribution(all_zones_df, output_path)
 
 
 def main():

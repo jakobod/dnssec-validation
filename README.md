@@ -28,8 +28,8 @@ from dnssec.probing.exception import *
 ```
 
 ## Adding new dependencies
-The usual `requirements.txt` is not used in this project. All requirements for the library are contained in the `setup.py`, tagged `install_requires`.
-Development requirements are gathered in the `dev-requirements.in`.
+The usual `requirements.txt` is not used in this project. All requirements for the library are contained in the `setup.py`, tagged `install_requires`.
+Development requirements are gathered in the `dev-requirements.in`.
 
 # Validation of zones
 These steps are conducted when a zone should be validated:

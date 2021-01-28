@@ -87,6 +87,7 @@ setup(
         "tldextract",
         "tqdm",
         "urllib3",
+        "seaborn",
     ],
     extras_require={
         # eg:

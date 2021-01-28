@@ -39,32 +39,28 @@ def is_flapping(zone_infos):
   return state == EvalState.FLAPPING
 
 
-def only_ksks(zone_info):
-  return zone_info.num_ksk != 0 and zone_info.num_zsk == 0
-
-
 def to_csv(args):
   zone_infos = []
   domains = []
   with open(args.input, 'r') as json_file:
     for line in json_file:
       result = ValidationResult().from_dict(json.loads(line))
-      flapping = is_flapping(result.zones)
-      domains.append(result.as_list()+[flapping])
+      if is_flapping(result.zones):
+        result.validation_state = 'PARTIAL'
+      domains.append(result.as_list())
 
       for zone_info in result.zones:
-        ksk_only = only_ksks(zone_info)
-        zone_infos.append(zone_info.as_list()+[ksk_only])
+        zone_infos.append(zone_info.as_list())
 
     all_domains_df = pd.DataFrame(
-        domains, columns=ValidationResult().member_names()+['is_flapping'])
+        domains, columns=ValidationResult().member_names())
     all_domains_df = all_domains_df.drop_duplicates(subset=['name'])
     all_domains_path = args.output_path+'all_domains.csv'
     all_domains_df.to_csv(all_domains_path, index=False)
     print('wrote', all_domains_path)
 
     all_zones_df = pd.DataFrame(
-        zone_infos, columns=ZoneInfo().member_names()+['only_ksks'])
+        zone_infos, columns=ZoneInfo().member_names())
     all_zones_df = all_zones_df.drop_duplicates(subset=['name'])
     all_zones_path = args.output_path+'all_zones.csv'
     all_zones_df.to_csv(all_zones_path, index=False)
