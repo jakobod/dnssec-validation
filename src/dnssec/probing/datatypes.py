@@ -86,7 +86,7 @@ class ZoneInfo(ValidationState):
     self.valid_soa = dct['valid_soa']
     self.num_ksk = dct['num_ksk']
     self.num_zsk = dct['num_zsk']
-    self.key_algos = dct['key_algos']
+    # self.key_algos = dct['key_algos']
     self.validated = dct['validated']
     return self
 

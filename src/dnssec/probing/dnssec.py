@@ -40,7 +40,7 @@ def is_valid_zone(zone):
   # Has not been checked before. Check it!
   soa = query(zone, dns.rdatatype.SOA)
   if soa.rrset is None:
-    raise RessourceMissingError(f'{zone} - SOA')
+    raise RessourceMissingError(f'SOA')
   exists = soa.rrset.name.to_text() == zone
   if exists:
     existing_zones[zone] = soa
@@ -86,16 +86,19 @@ def get_all_from(response, rd_type, covers=dns.rdatatype.TYPE0):
 def raw_query(zone, record_type, ns_addr='8.8.8.8'):
   request = dns.message.make_query(
       zone, record_type, want_dnssec=True)
-  try:
-    response, _ = dns.query.udp_with_fallback(
-        request, ns_addr, timeout=3)
-  except dns.exception.Timeout:
-    raise TimeoutError(
-        f'{dns.rdatatype.to_text(record_type)}@{zone}')
-  if response.rcode() != 0:
-    raise QueryError(
-        f'{dns.rdatatype.to_text(record_type)}@{zone}: {dns.rcode.to_text(response.rcode())}')
-  return response
+  for _ in range(3):  # Retry maximum 3 times
+    timeout = False
+    try:
+      response, _ = dns.query.udp_with_fallback(
+          request, ns_addr, timeout=3)
+    except dns.exception.Timeout:
+      continue
+    if response.rcode() != 0:
+      raise QueryError(
+          f'{dns.rdatatype.to_text(record_type)}: {dns.rcode.to_text(response.rcode())}')
+    return response
+  # this should only happen if the timeout happened 3 times!
+  raise TimeoutError(f'{dns.rdatatype.to_text(record_type)}')
 
 
 def query(zone, record_type, ns_addr='8.8.8.8'):
@@ -205,7 +208,7 @@ def validate_root_zone():
   ns = '198.41.0.4'  # IP of a.root-servers.net. This doesn't have to be validated!
   dnskey = query('.', dns.rdatatype.DNSKEY, ns)
   if dnskey.rrset is None:
-    raise RessourceMissingError('. - DNSKEY')
+    raise RessourceMissingError('DNSKEY')
   zone = Zone('.', dnskey, ns, None, None)
 
   # Validate
@@ -230,7 +233,7 @@ def validate_zone(zone, parent_zone):
   try:
     ns_addr = query(zone.soa.rrset[0].mname.to_text(), dns.rdatatype.A)
     if ns_addr.rrset is None:
-      raise RessourceMissingError(f'{zone.name} - NS A record')
+      raise RessourceMissingError(f'NS A')
     zone.ns = ns_addr.rrset[0].to_text()
     ds, nsec_type = query_DS(zone, parent_zone)
     zone.dnskey = query(zone.name, dns.rdatatype.DNSKEY, zone.ns)
