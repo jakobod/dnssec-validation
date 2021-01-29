@@ -223,6 +223,14 @@ def parse_deployed_keys(dnskey_rrset):
   return counts[257], counts[256], list(algorithms)
 
 
+def parse_ds_digests(ds_rrset):
+  strings = ['NULL', 'SHA1', 'SHA256', 'GOST', 'SHA384']
+  digests = set()
+  for ds in ds_rrset:
+    digests.add(strings[ds.digest_type])
+  return list(digests)
+
+
 def validate_zone(zone, parent_zone):
   zone_info = ZoneInfo(zone.name)
   try:
@@ -231,6 +239,8 @@ def validate_zone(zone, parent_zone):
       raise RessourceMissingError(f'NS A')
     zone.ns = ns_addr.rrset[0].to_text()
     ds, nsec_type = query_DS(zone, parent_zone)
+    if ds:
+      zone_info.ds_digests = parse_ds_digests(ds.rrset)
     zone.dnskey = query(zone.name, dns.rdatatype.DNSKEY, zone.ns)
     ## Checks ##
     zone_info.has_dnskey = zone.dnskey.rrset is not None

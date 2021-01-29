@@ -17,9 +17,9 @@ from setuptools import setup
 
 
 def read(*names, **kwargs):
-  return io.open(
-      join(dirname(__file__), *names), encoding=kwargs.get("encoding", "utf8")
-  ).read()
+    return io.open(
+        join(dirname(__file__), *names), encoding=kwargs.get("encoding", "utf8")
+    ).read()
 
 
 setup(
@@ -88,6 +88,7 @@ setup(
         "tqdm",
         "urllib3",
         "seaborn",
+        "ordered-enum"
     ],
     extras_require={
         # eg:

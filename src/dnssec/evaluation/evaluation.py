@@ -4,6 +4,8 @@ import json
 import pandas as pd
 import time
 import argparse
+
+from collections import defaultdict
 from dnssec.probing.datatypes import *
 from dnssec.evaluation import plot
 from enum import Enum
@@ -49,21 +51,10 @@ def is_flapping(zone_infos):
   return state == EvalState.FLAPPING
 
 
-def is_tld(zone_name):
-  return
-
-
-def find_keys(keys):
-  # keyset = set(keys)
-  # for key in keyset:
-  #   if algorithms[key] <= Severity.NOT_RECOMMENDED:
-  #     print(key, 'NOT SECURE!')
-  pass
-
-
 def to_csv(args):
   zone_infos = []
   domains = []
+  key_count = defaultdict(lambda: 0)
   with open(args.input, 'r') as json_file:
     for line in json_file:
       result = ValidationResult().from_dict(json.loads(line))
@@ -73,8 +64,13 @@ def to_csv(args):
       domains.append(result.as_list()+[ext_tld])
 
       for zone_info in result.zones:
-        find_keys(zone_info.key_algos)
+        for key in set(zone_info.key_algos):
+          key_count[key] += 1
         zone_infos.append(zone_info.as_list()+[ext_tld])
+
+    print('key_counts')
+    for key in key_count:
+      print(key, '=', key_count[key])
 
     all_domains_df = pd.DataFrame(
         domains, columns=ValidationResult().member_names()+['tld'])
@@ -95,11 +91,9 @@ def main():
   # action='store_true'
   parser = argparse.ArgumentParser()
   parser.add_argument(
-      '--input', help='The json that should be evaluated', metavar='INPUT_FILE')
+      '-i', '--input', help='The json that should be evaluated', metavar='INPUT_FILE')
   parser.add_argument(
       '-o', '--output-path', help='Path at which created files are written to', metavar='OUTPUT_PATH')
-  parser.add_argument(
-      '-c', '--to-csv', help='Evaluate the given input file and save it to csv', action='store_true')
   parser.add_argument(
       '-p', '--plot', help='Plot the evaluated files and save them to OUTPUT_PATH', action='store_true')
 

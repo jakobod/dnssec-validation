@@ -14,20 +14,6 @@ import numpy as np
 # [] Visualize trust chain
 
 
-algorithms = {'RSAMD5': 'MUST NOT',
-              'DSA': 'MUST NOT',
-              'RSASHA1': 'NOT RECOMMENDED',
-              'DSANSEC3SHA1': 'MUST NOT',
-              'RSASHA1NSEC3SHA1': 'NOT RECOMMENDED',
-              'RSASHA256': 'MUST',
-              'RSASHA512': 'NOT RECOMMENDED',
-              'ECCGOST': 'MUST NOT',
-              'ECDSAP256SHA256': 'MUST',
-              'ECDSAP384SHA384': 'MAY',
-              'ED25519': 'RECOMMENDED',
-              'ED448': 'MAY'}
-
-
 def plot_or_show(output_path, figure_name):
   if output_path:
     plt.savefig(output_path+figure_name,
@@ -131,8 +117,8 @@ def get_from_df(df, keys):
   return lst
 
 
-def get_list(df, to_drop, what):
-  dropped = df.drop(df[(df['validation_state'] != to_drop)].index)
+def get_list(df, to_keep, what):
+  dropped = df.drop(df[(df['validation_state'] != to_keep)].index)
   dropped = dropped.groupby('tld').count()
   return get_from_df(dropped, what)
 
@@ -182,8 +168,9 @@ def plot_partial_validations(df, output_path):
 
 # TODO This is not representative. Or is it?!
 def plot_deployment_across_popularity(df, output_path):
-  index_df = df.reset_index()
-  sampled_df = index_df.sample(frac=0.3)
+  # index_df = df.reset_index()
+  sampled_df = df.reset_index()
+  # sampled_df = index_df.sample(frac=1)
 
   sampled_df.drop(sampled_df.columns.difference(
       ['index', 'validation_state']), 1, inplace=True)
