@@ -215,12 +215,12 @@ def validate_root_zone():
 
 
 def parse_deployed_keys(dnskey_rrset):
-  algorithms = []
+  algorithms = set()
   counts = defaultdict(lambda: 0)
   for key in dnskey_rrset:
     counts[key.flags] += 1
-    algorithms.append(dns.dnssec.algorithm_to_text(key.algorithm))
-  return counts[257], counts[256], algorithms
+    algorithms.add(dns.dnssec.algorithm_to_text(key.algorithm))
+  return counts[257], counts[256], list(algorithms)
 
 
 def validate_zone(zone, parent_zone):
