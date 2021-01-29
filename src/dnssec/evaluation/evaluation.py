@@ -7,6 +7,7 @@ import argparse
 from dnssec.probing.datatypes import *
 from dnssec.evaluation import plot
 from enum import Enum
+from dnssec.evaluation import tld
 
 algorithms = {'RSAMD5': 'MUST NOT',
               'DSA': 'MUST NOT',
@@ -39,6 +40,10 @@ def is_flapping(zone_infos):
   return state == EvalState.FLAPPING
 
 
+def is_tld(zone_name):
+  return
+
+
 def to_csv(args):
   zone_infos = []
   domains = []
@@ -47,24 +52,27 @@ def to_csv(args):
       result = ValidationResult().from_dict(json.loads(line))
       if is_flapping(result.zones):
         result.validation_state = 'PARTIAL'
-      domains.append(result.as_list())
+      ext_tld = tld.extract(result.name)
+      domains.append(result.as_list()+[ext_tld])
 
       for zone_info in result.zones:
-        zone_infos.append(zone_info.as_list())
+        zone_infos.append(zone_info.as_list()+[ext_tld])
 
     all_domains_df = pd.DataFrame(
-        domains, columns=ValidationResult().member_names())
+        domains, columns=ValidationResult().member_names()+['tld'])
     all_domains_df = all_domains_df.drop_duplicates(subset=['name'])
     all_domains_path = args.output_path+'all_domains.csv'
     all_domains_df.to_csv(all_domains_path, index=False)
     print('wrote', all_domains_path)
+    print(all_domains_df)
 
     all_zones_df = pd.DataFrame(
-        zone_infos, columns=ZoneInfo().member_names())
+        zone_infos, columns=ZoneInfo().member_names()+['tld'])
     all_zones_df = all_zones_df.drop_duplicates(subset=['name'])
     all_zones_path = args.output_path+'all_zones.csv'
     all_zones_df.to_csv(all_zones_path, index=False)
     print('wrote', all_zones_path)
+    print(all_zones_df)
 
 
 def main():
