@@ -111,3 +111,4 @@ TDU124P7EGELLSS91RPV7H8S4DKOE2EH.com.cn. 21600 IN RRSIG	NSEC3 8 3 21600 20210220
 # Links for reference
 - https://www.cloudflare.com/dns/dnssec/how-dnssec-works/
 - https://github.com/prateekroy/CSE534/blob/master/HW1/dnssec.py
+- https://blog.cloudflare.com/black-lies/

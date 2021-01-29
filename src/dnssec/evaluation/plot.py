@@ -121,6 +121,65 @@ def plot_deployment(df, output_path):
   plot_or_show(output_path, 'dnssec_deployment.pdf')
 
 
+def get_from_df(df, keys):
+  lst = []
+  for key in keys:
+    try:
+      lst.append(df.loc[key].get(0))
+    except KeyError:
+      lst.append(0)
+  return lst
+
+
+def get_list(df, to_drop, what):
+  dropped = df.drop(df[(df['validation_state'] != to_drop)].index)
+  dropped = dropped.groupby('tld').count()
+  return get_from_df(dropped, what)
+
+
+def plot_partial_validations(df, output_path):
+  partial_df = df.drop(df[(df['validation_state'] != 'PARTIAL')].index)
+  print(partial_df)
+  partial_df = partial_df.groupby('tld').count()
+  partial_df.drop(partial_df.columns.difference(
+      ['name']), 1, inplace=True)
+  partial_df.columns = ['count']
+  partial_list = partial_df['count'].values
+
+  partial_df.plot.bar(rot=0, figsize=(12, 5), stacked=True)
+  plt.xlabel('TLD')
+  plt.ylabel('Count [#]')
+  plt.title('Partially Broken Chains', loc='left')
+  plot_or_show(output_path, 'partial_dnssec_deployment.pdf')
+
+  tlds = partial_df.index
+
+  all_domains_with_tld_df = df.drop(
+      df[(~df['tld'].isin(partial_df.index))].index)
+
+  columns = []
+  for state in ['VALIDATED', 'UNSECURED', 'TIMEOUT', 'QUERY_ERROR', 'MISSING_RESSOURCE', 'OTHER']:
+    columns.append(get_list(all_domains_with_tld_df, state, tlds))
+
+  # For completeness sake: This will also include the errors. In the current dataset no errors were present, so 'm deleting them
+  # new_df = pd.DataFrame({'partial': partial_list,
+  #                        'validated': columns[0], 'unsecured': columns[1], 'timeout': columns[2],
+  #                        'query_error': columns[3], 'missing_ressource': columns[4], 'other': columns[5]}, index=tlds)
+
+  new_df = pd.DataFrame(
+      {'partial': partial_list,   'unsecured': columns[1]}, index=tlds)
+
+  print(new_df)
+
+  # count_df.sort_values(by='count', inplace=True, ascending=False)
+  new_df.plot.bar(rot=0, figsize=(12, 5), stacked=True)
+
+  plt.xlabel('TLD')
+  plt.ylabel('Count [#]')
+  plt.title('Partially Broken Chains', loc='left')
+  plot_or_show(output_path, 'partial_dnssec_deployment_stacked.pdf')
+
+
 # TODO This is not representative. Or is it?!
 def plot_deployment_across_popularity(df, output_path):
   index_df = df.reset_index()
@@ -151,6 +210,7 @@ def plot(input_path, output_path):
   plot_nsec_version(all_zones_df, output_path)
   plot_by_tld(all_domains_df, output_path)
   plot_ciphers(all_zones_df, output_path)
+  plot_partial_validations(all_domains_df, output_path)
 
 
 def main():

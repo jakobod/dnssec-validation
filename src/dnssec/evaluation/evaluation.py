@@ -7,21 +7,30 @@ import argparse
 from dnssec.probing.datatypes import *
 from dnssec.evaluation import plot
 from enum import Enum
+from ordered_enum import OrderedEnum
 from dnssec.evaluation import tld
 
-algorithms = {'RSAMD5': 'MUST NOT',
-              'DSA': 'MUST NOT',
-              'RSASHA1': 'NOT RECOMMENDED',
-              'DSANSEC3SHA1': 'MUST NOT',
-              'RSASHA1NSEC3SHA1': 'NOT RECOMMENDED',
-              'RSASHA256': 'MUST',
-              'RSASHA512': 'NOT RECOMMENDED',
-              'ECCGOST': 'MUST NOT',
-              'ECDSAP256SHA256': 'MUST',
-              'ECDSAP384SHA384': 'MAY',
-              'ED25519': 'RECOMMENDED',
-              'ED448': 'MAY'
-              }
+
+class Severity(OrderedEnum):
+  MUST_NOT = 0,
+  NOT_RECOMMENDED = 1,
+  MAY = 2,
+  RECOMMENDED = 3,
+  MUST = 4
+
+
+algorithms = {'RSAMD5': Severity.MUST_NOT,
+              'DSA': Severity.MUST_NOT,
+              'RSASHA1': Severity.NOT_RECOMMENDED,
+              'DSANSEC3SHA1': Severity.MUST_NOT,
+              'RSASHA1NSEC3SHA1': Severity.NOT_RECOMMENDED,
+              'RSASHA256': Severity.MUST,
+              'RSASHA512': Severity.NOT_RECOMMENDED,
+              'ECCGOST': Severity.MUST_NOT,
+              'ECDSAP256SHA256': Severity.MUST,
+              'ECDSAP384SHA384': Severity.MAY,
+              'ED25519': Severity.RECOMMENDED,
+              'ED448': Severity.MAY}
 
 
 class EvalState(Enum):
@@ -44,6 +53,14 @@ def is_tld(zone_name):
   return
 
 
+def find_keys(keys):
+  # keyset = set(keys)
+  # for key in keyset:
+  #   if algorithms[key] <= Severity.NOT_RECOMMENDED:
+  #     print(key, 'NOT SECURE!')
+  pass
+
+
 def to_csv(args):
   zone_infos = []
   domains = []
@@ -56,6 +73,7 @@ def to_csv(args):
       domains.append(result.as_list()+[ext_tld])
 
       for zone_info in result.zones:
+        find_keys(zone_info.key_algos)
         zone_infos.append(zone_info.as_list()+[ext_tld])
 
     all_domains_df = pd.DataFrame(
@@ -64,7 +82,6 @@ def to_csv(args):
     all_domains_path = args.output_path+'all_domains.csv'
     all_domains_df.to_csv(all_domains_path, index=False)
     print('wrote', all_domains_path)
-    print(all_domains_df)
 
     all_zones_df = pd.DataFrame(
         zone_infos, columns=ZoneInfo().member_names()+['tld'])
@@ -72,7 +89,6 @@ def to_csv(args):
     all_zones_path = args.output_path+'all_zones.csv'
     all_zones_df.to_csv(all_zones_path, index=False)
     print('wrote', all_zones_path)
-    print(all_zones_df)
 
 
 def main():
