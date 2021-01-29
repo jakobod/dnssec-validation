@@ -14,11 +14,16 @@ from dnssec.evaluation import tld
 
 
 class Severity(OrderedEnum):
-  MUST_NOT = 0,
-  NOT_RECOMMENDED = 1,
-  MAY = 2,
-  RECOMMENDED = 3,
+  MUST_NOT = 0
+  NOT_RECOMMENDED = 1
+  MAY = 2
+  RECOMMENDED = 3
   MUST = 4
+
+
+def severity_to_string(severity):
+  names = ['MUST_NOT', 'NOT_RECOMMENDED', 'MAY', 'RECOMMENDED', 'MUST']
+  return names[severity.value]
 
 
 algorithms = {'RSAMD5': Severity.MUST_NOT,
@@ -34,11 +39,17 @@ algorithms = {'RSAMD5': Severity.MUST_NOT,
               'ED25519': Severity.RECOMMENDED,
               'ED448': Severity.MAY}
 
+digests = {'NULL': Severity.MUST_NOT,
+           'SHA1': Severity.MUST_NOT,
+           'SHA256': Severity.MUST,
+           'GOST': Severity.MUST_NOT,
+           'SHA384': Severity.MAY}
+
 
 class EvalState(Enum):
-  UNBROKEN = 0,
-  BROKEN = 1,
-  FLAPPING = 2,
+  UNBROKEN = 0
+  BROKEN = 1
+  FLAPPING = 2
 
 
 def is_flapping(zone_infos):
@@ -54,7 +65,9 @@ def is_flapping(zone_infos):
 def to_csv(args):
   zone_infos = []
   domains = []
-  key_count = defaultdict(lambda: 0)
+  algo_count = defaultdict(lambda: 0)
+  digest_count = defaultdict(lambda: 0)
+
   with open(args.input, 'r') as json_file:
     for line in json_file:
       result = ValidationResult().from_dict(json.loads(line))
@@ -64,13 +77,49 @@ def to_csv(args):
       domains.append(result.as_list()+[ext_tld])
 
       for zone_info in result.zones:
-        for key in set(zone_info.key_algos):
-          key_count[key] += 1
+        for algo in set(zone_info.key_algos):
+          algo_count[algo] += 1
+        for digest in set(zone_info.ds_digests):
+          digest_count[digest] += 1
         zone_infos.append(zone_info.as_list()+[ext_tld])
 
-    print('key_counts')
-    for key in key_count:
-      print(key, '=', key_count[key])
+    algo_counts = []
+    algo_names = []
+    algo_recommendation = []
+    algo_conformity = []
+    for algo in algo_count:
+      if algorithms[algo] <= Severity.NOT_RECOMMENDED:
+        algo_conformity.append('NON_CONFORMING')
+      else:
+        algo_conformity.append('CONFORMING')
+      algo_names.append(algo)
+      algo_recommendation.append(severity_to_string(algorithms[algo]))
+      algo_counts.append(algo_count[algo])
+
+    digest_counts = []
+    digest_names = []
+    digest_recommendation = []
+    digest_conformity = []
+    for digest in digest_count:
+      if digests[digest] <= Severity.NOT_RECOMMENDED:
+        digest_conformity.append('NON_CONFORMING')
+      else:
+        digest_conformity.append('CONFORMING')
+      digest_names.append(digest)
+      digest_recommendation.append(severity_to_string(digests[digest]))
+      digest_counts.append(digest_count[digest])
+
+    algo_count_df = pd.DataFrame(
+        {'name': algo_names, 'count': algo_counts, 'recommendation': algo_recommendation, 'standard_conforming': algo_conformity})
+    algo_count_path = args.output_path+'dnskey_algorithms.csv'
+    algo_count_df.to_csv(algo_count_path, index=False)
+    print('wrote', algo_count_path)
+
+    digest_count_df = pd.DataFrame(
+        {'name': digest_names, 'count': digest_counts, 'recommendation': digest_recommendation, 'standard_conforming': digest_conformity})
+    digest_count_path = args.output_path+'ds_digests.csv'
+    digest_count_df.to_csv(digest_count_path, index=False)
+    print('wrote', digest_count_path)
 
     all_domains_df = pd.DataFrame(
         domains, columns=ValidationResult().member_names()+['tld'])

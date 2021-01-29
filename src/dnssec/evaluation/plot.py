@@ -22,8 +22,48 @@ def plot_or_show(output_path, figure_name):
     plt.show()
 
 
-def plot_ciphers(df, output_path):
-  print(df)
+def plot_dnskey_algorithms(df, output_path):
+  df.sort_values(by='count', inplace=True, ascending=False)
+  colors = []
+  for val in df['standard_conforming']:
+    if val == 'CONFORMING':
+      colors.append('#1f77b4')
+    else:
+      colors.append('#ff7f0e')
+  df.plot.bar(x='name', y='count', color=colors, rot=45, figsize=(12, 5))
+  plt.gca().get_legend().remove()
+  plt.title('DNSKEY Algorithms used', loc='left')
+  plt.xlabel('DNSKEY Algorithm')
+  plt.ylabel('Count [#]')
+  plot_or_show(output_path, 'dnskey_algorithms.pdf')
+
+  df.plot.pie(y='count', figsize=(7, 7),
+              labels=df['name'], labeldistance=None, explode=[.05, .05, .05, .05, .05, .05, .05, .05], pctdistance=1.1, startangle=90, autopct='%1.1f%%', title='DNSKEY Algorithms used')
+  plt.ylabel('')
+  plt.tight_layout()
+  plot_or_show(output_path, 'dnskey_algorithms_pie.pdf')
+
+
+def plot_ds_digests(df, output_path):
+  df.sort_values(by='count', inplace=True, ascending=False)
+  colors = []
+  for val in df['standard_conforming']:
+    if val == 'CONFORMING':
+      colors.append('#1f77b4')
+    else:
+      colors.append('#ff7f0e')
+  df.plot.bar(x='name', y='count', color=colors, rot=45, figsize=(12, 5))
+  plt.gca().get_legend().remove()
+  plt.title('DS Digests used', loc='left')
+  plt.xlabel('DS Digest')
+  plt.ylabel('Count [#]')
+  plot_or_show(output_path, 'ds_digests.pdf')
+
+  df.plot.pie(y='count', figsize=(7, 7),
+              labels=df['name'], labeldistance=None, explode=[.05, .05, .05, .05], pctdistance=1.1, startangle=90, autopct='%1.1f%%', title='DS Digests used')
+  plt.ylabel('')
+  plt.tight_layout()
+  plot_or_show(output_path, 'ds_digests_pie.pdf')
 
 
 def get_count(df, tld, key):
@@ -125,7 +165,6 @@ def get_list(df, to_keep, what):
 
 def plot_partial_validations(df, output_path):
   partial_df = df.drop(df[(df['validation_state'] != 'PARTIAL')].index)
-  print(partial_df)
   partial_df = partial_df.groupby('tld').count()
   partial_df.drop(partial_df.columns.difference(
       ['name']), 1, inplace=True)
@@ -153,9 +192,7 @@ def plot_partial_validations(df, output_path):
   #                        'query_error': columns[3], 'missing_ressource': columns[4], 'other': columns[5]}, index=tlds)
 
   new_df = pd.DataFrame(
-      {'partial': partial_list,   'unsecured': columns[1]}, index=tlds)
-
-  print(new_df)
+      {'partial': partial_list, 'unsecured': columns[1]}, index=tlds)
 
   # count_df.sort_values(by='count', inplace=True, ascending=False)
   new_df.plot.bar(rot=0, figsize=(12, 5), stacked=True)
@@ -190,14 +227,17 @@ def plot_deployment_across_popularity(df, output_path):
 def plot(input_path, output_path):
   all_domains_df = pd.read_csv(input_path+'all_domains.csv')
   all_zones_df = pd.read_csv(input_path+'all_zones.csv')
+  dnskey_algorithms_df = pd.read_csv(input_path+'dnskey_algorithms.csv')
+  ds_digests_df = pd.read_csv(input_path+'ds_digests.csv')
 
-  plot_deployment(all_domains_df, output_path)
-  plot_deployment_across_popularity(all_domains_df, output_path)
-  plot_key_distribution(all_zones_df, output_path)
-  plot_nsec_version(all_zones_df, output_path)
-  plot_by_tld(all_domains_df, output_path)
-  plot_ciphers(all_zones_df, output_path)
-  plot_partial_validations(all_domains_df, output_path)
+  # plot_deployment(all_domains_df, output_path)
+  # plot_deployment_across_popularity(all_domains_df, output_path)
+  # plot_key_distribution(all_zones_df, output_path)
+  # plot_nsec_version(all_zones_df, output_path)
+  # plot_by_tld(all_domains_df, output_path)
+  plot_dnskey_algorithms(dnskey_algorithms_df, output_path)
+  plot_ds_digests(ds_digests_df, output_path)
+  # plot_partial_validations(all_domains_df, output_path)
 
 
 def main():
