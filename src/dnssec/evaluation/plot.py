@@ -15,10 +15,13 @@ from collections import defaultdict
 # [] Visualize trust chain
 
 
+standard_width = (10, 4)
+
+
 def plot_or_show(output_path, figure_name):
   if output_path:
     plt.savefig(output_path+figure_name,
-                bbox_inches='tight')
+                bbox_inches='tight', transparent=True)
     print('wrote', output_path+figure_name)
   else:
     plt.show()
@@ -51,7 +54,8 @@ def plot_dnskey_algorithms(df, output_path):
   df.sort_values(by='count', inplace=True, ascending=False)
   colors = [(lambda x: '#1f77b4' if x == 'CONFORMING' else '#ff7f0e')(x)
             for x in df['standard_conforming']]
-  ax = df.plot.bar(x='name', y='count', color=colors, rot=45, figsize=(12, 5))
+  ax = df.plot.bar(x='name', y='count', color=colors,
+                   rot=45, figsize=standard_width)
   add_labels_to_bars(ax, 7)
 
   ax.get_legend().remove()
@@ -71,7 +75,8 @@ def plot_ds_digests(df, output_path):
   df.sort_values(by='count', inplace=True, ascending=False)
   colors = [(lambda x: '#1f77b4' if x == 'CONFORMING' else '#ff7f0e')(x)
             for x in df['standard_conforming']]
-  ax = df.plot.bar(x='name', y='count', color=colors, rot=45, figsize=(12, 5))
+  ax = df.plot.bar(x='name', y='count', color=colors,
+                   rot=45, figsize=standard_width)
   add_labels_to_bars(ax, 13)
 
   ax.get_legend().remove()
@@ -117,7 +122,7 @@ def plot_by_tld(df, output_path):
   new_df.sort_values(by='TOTAL', inplace=True, ascending=False)
   new_df.drop('TOTAL', 1, inplace=True)
   new_df = new_df[:20]
-  new_df.plot.bar(stacked=True, figsize=(12, 5))
+  new_df.plot.bar(stacked=True, figsize=standard_width)
   plot_or_show(output_path, 'results_by_tld.pdf')
 
 
@@ -130,7 +135,7 @@ def plot_nsec_version(df, output_path):
   count_df.columns = ['version', 'count']
 
   ax = count_df.plot.bar(x='version', y='count',
-                         color=['#ff7f0e', '#1f77b4'], rot=0, figsize=(12, 5))
+                         color=['#ff7f0e', '#1f77b4'], rot=0, figsize=standard_width)
   add_labels_to_bars(ax, 26)
 
   ax.get_legend().remove()
@@ -164,7 +169,7 @@ def plot_deployment(df, output_path):
   count_df.sort_values(by='count', inplace=True, ascending=False)
 
   ax = count_df.plot.bar(x='validation_state', y='count',
-                         rot=0, figsize=(12, 5))
+                         rot=0, figsize=standard_width)
   add_labels_to_bars(ax, 7)
 
   plt.xlabel('Result')
@@ -197,7 +202,7 @@ def plot_partial_validations(df, output_path):
   partial_df.columns = ['count']
   partial_list = partial_df['count'].values
 
-  ax = partial_df.plot.bar(rot=0, figsize=(12, 5))
+  ax = partial_df.plot.bar(rot=0, figsize=standard_width)
   add_labels_to_bars(ax, 17, 0.1)
   ax.get_legend().remove()
   plt.xlabel('TLD')
@@ -222,7 +227,7 @@ def plot_partial_validations(df, output_path):
   new_df = pd.DataFrame(
       {'partial': partial_list, 'unsecured': columns[1]}, index=tlds)
 
-  ax = new_df.plot.bar(rot=0, figsize=(12, 5), stacked=True)
+  ax = new_df.plot.bar(rot=0, figsize=standard_width, stacked=True)
   add_labels_to_stacked_bars(ax, 17, 3)
 
   plt.xlabel('TLD')
