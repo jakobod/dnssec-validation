@@ -22,6 +22,15 @@ def plot_or_show(output_path, figure_name):
     plt.show()
 
 
+def add_labels_to_bars(ax, width):
+  for p in ax.patches:
+    height = str(p.get_height())
+    padding_len = int((width - len(height)))
+    padding = ' ' * padding_len
+    label = padding + height
+    ax.annotate(label, (p.get_x(), p.get_height() + 1000))
+
+
 def plot_dnskey_algorithms(df, output_path):
   df.sort_values(by='count', inplace=True, ascending=False)
   colors = []
@@ -30,18 +39,20 @@ def plot_dnskey_algorithms(df, output_path):
       colors.append('#1f77b4')
     else:
       colors.append('#ff7f0e')
-  df.plot.bar(x='name', y='count', color=colors, rot=45, figsize=(12, 5))
-  plt.gca().get_legend().remove()
+  ax = df.plot.bar(x='name', y='count', color=colors, rot=45, figsize=(12, 5))
+  add_labels_to_bars(ax, 7)
+
+  ax.get_legend().remove()
   plt.title('DNSKEY Algorithms used', loc='left')
   plt.xlabel('DNSKEY Algorithm')
   plt.ylabel('Count [#]')
   plot_or_show(output_path, 'dnskey_algorithms.pdf')
 
-  df.plot.pie(y='count', figsize=(7, 7),
-              labels=df['name'], labeldistance=None, explode=[.05, .05, .05, .05, .05, .05, .05, .05], pctdistance=1.1, startangle=90, autopct='%1.1f%%', title='DNSKEY Algorithms used')
-  plt.ylabel('')
-  plt.tight_layout()
-  plot_or_show(output_path, 'dnskey_algorithms_pie.pdf')
+  # df.plot.pie(y='count', figsize=(7, 7),
+  #             labels=df['name'], labeldistance=None, explode=[.05, .05, .05, .05, .05, .05, .05, .05], pctdistance=1.1, startangle=90, autopct='%1.1f%%', title='DNSKEY Algorithms used')
+  # plt.ylabel('')
+  # plt.tight_layout()
+  # plot_or_show(output_path, 'dnskey_algorithms_pie.pdf')
 
 
 def plot_ds_digests(df, output_path):
@@ -52,18 +63,20 @@ def plot_ds_digests(df, output_path):
       colors.append('#1f77b4')
     else:
       colors.append('#ff7f0e')
-  df.plot.bar(x='name', y='count', color=colors, rot=45, figsize=(12, 5))
-  plt.gca().get_legend().remove()
+  ax = df.plot.bar(x='name', y='count', color=colors, rot=45, figsize=(12, 5))
+  add_labels_to_bars(ax, 13)
+
+  ax.get_legend().remove()
   plt.title('DS Digests used', loc='left')
   plt.xlabel('DS Digest')
   plt.ylabel('Count [#]')
   plot_or_show(output_path, 'ds_digests.pdf')
 
-  df.plot.pie(y='count', figsize=(7, 7),
-              labels=df['name'], labeldistance=None, explode=[.05, .05, .05, .05], pctdistance=1.1, startangle=90, autopct='%1.1f%%', title='DS Digests used')
-  plt.ylabel('')
-  plt.tight_layout()
-  plot_or_show(output_path, 'ds_digests_pie.pdf')
+  # df.plot.pie(y='count', figsize=(7, 7),
+  #             labels=df['name'], labeldistance=None, explode=[.05, .05, .05, .05], pctdistance=1.1, startangle=90, autopct='%1.1f%%', title='DS Digests used')
+  # plt.ylabel('')
+  # plt.tight_layout()
+  # plot_or_show(output_path, 'ds_digests_pie.pdf')
 
 
 def get_count(df, tld, key):

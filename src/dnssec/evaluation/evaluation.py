@@ -11,6 +11,7 @@ from dnssec.evaluation import plot
 from enum import Enum
 from ordered_enum import OrderedEnum
 from dnssec.evaluation import tld
+from os import path
 
 
 class Severity(OrderedEnum):
