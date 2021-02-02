@@ -18,6 +18,14 @@ from collections import defaultdict
 standard_width = (10, 4)
 
 
+def y_formatter(y, pos):
+  if y >= 1_000_000:
+    return '{:>}M'.format(int(y / 1_000_000))
+  elif y >= 1_000:
+    return '{:>}K'.format(int(y / 1_000))
+  return '{:>}'.format(int(y))
+
+
 def plot_or_show(output_path, figure_name):
   if output_path:
     plt.savefig(output_path+figure_name,
@@ -52,20 +60,17 @@ def add_labels_to_bars(ax, width, height_offset=1000):
 
 def plot_dnskey_algorithms(df, output_path):
   df.sort_values(by='count', inplace=True, ascending=False)
-  colors = [(lambda x: '#1f77b4' if x == 'CONFORMING' else '#ff7f0e')(x)
-            for x in df['standard_conforming']]
-  ax = df.plot.bar(x='name', y='count', color=colors,
-                   rot=45, figsize=standard_width)
-  add_labels_to_bars(ax, 7)
 
-  ax.get_legend().remove()
-  plt.title('DNSKEY Algorithms used', loc='left')
-  plt.xlabel('DNSKEY Algorithm')
-  plt.ylabel('Count [#]')
-  plot_or_show(output_path, 'dnskey_algorithms.pdf')
-
-  df.plot.pie(y='count', figsize=(7, 7),
-              labels=df['name'], labeldistance=None, explode=[.05, .05, .05, .05, .05, .05, .05, .05], pctdistance=1.1, startangle=90, autopct='%1.1f%%', title='DNSKEY Algorithms used')
+  ax = df.plot.pie(y='count', figsize=standard_width,
+                   labels=df['name'], labeldistance=None, explode=[.05, .05, .05, .05, .05, .05, .05, .05], pctdistance=1.1, startangle=90)
+  percent = 100.*df['count'].values/df['count'].values.sum()
+  labels = ['{0} - {1:1.2f} %'.format(i, j)
+            for i, j in zip(df['name'], percent)]
+  patches, labels, dummy = zip(*sorted(zip(ax.patches, labels, df['count'].values),
+                                       key=lambda x: x[2],
+                                       reverse=True))
+  plt.legend(patches, labels, bbox_to_anchor=(.97, 0.5), loc='center right', bbox_transform=plt.gcf().transFigure,
+             fontsize=8, prop={'size': 10})
   plt.ylabel('')
   plt.tight_layout()
   plot_or_show(output_path, 'dnskey_algorithms_pie.pdf')
@@ -73,20 +78,20 @@ def plot_dnskey_algorithms(df, output_path):
 
 def plot_ds_digests(df, output_path):
   df.sort_values(by='count', inplace=True, ascending=False)
-  colors = [(lambda x: '#1f77b4' if x == 'CONFORMING' else '#ff7f0e')(x)
-            for x in df['standard_conforming']]
-  ax = df.plot.bar(x='name', y='count', color=colors,
-                   rot=45, figsize=standard_width)
-  add_labels_to_bars(ax, 13)
 
-  ax.get_legend().remove()
-  plt.title('DS Digests used', loc='left')
-  plt.xlabel('DS Digest')
-  plt.ylabel('Count [#]')
-  plot_or_show(output_path, 'ds_digests.pdf')
+  ax = df.plot.pie(y='count', figsize=standard_width,
+                   labels=df['name'], labeldistance=None,
+                   explode=[.05, .05, .05, .05], pctdistance=1.1,
+                   startangle=90)
+  percent = 100.*df['count'].values/df['count'].values.sum()
+  labels = ['{0} - {1:1.2f} %'.format(i, j)
+            for i, j in zip(df['name'], percent)]
+  patches, labels, dummy = zip(*sorted(zip(ax.patches, labels, df['count'].values),
+                                       key=lambda x: x[2],
+                                       reverse=True))
+  plt.legend(patches, labels, bbox_to_anchor=(.9, 0.5), loc='center right', bbox_transform=plt.gcf().transFigure,
+             fontsize=8, prop={'size': 10})
 
-  df.plot.pie(y='count', figsize=(7, 7),
-              labels=df['name'], labeldistance=None, explode=[.05, .05, .05, .05], pctdistance=1.1, startangle=90, autopct='%1.1f%%', title='DS Digests used')
   plt.ylabel('')
   plt.tight_layout()
   plot_or_show(output_path, 'ds_digests_pie.pdf')
@@ -122,7 +127,9 @@ def plot_by_tld(df, output_path):
   new_df.sort_values(by='TOTAL', inplace=True, ascending=False)
   new_df.drop('TOTAL', 1, inplace=True)
   new_df = new_df[:20]
-  new_df.plot.bar(stacked=True, figsize=standard_width)
+  ax = new_df.plot.bar(stacked=True, figsize=standard_width)
+  ax.yaxis.set_major_formatter(plt.FuncFormatter(y_formatter))
+
   plot_or_show(output_path, 'results_by_tld.pdf')
 
 
@@ -133,15 +140,17 @@ def plot_nsec_version(df, output_path):
   count_df.drop(count_df.columns.difference(
       ['reason', 'name']), 1, inplace=True)
   count_df.columns = ['version', 'count']
+  count_df.sort_values(by='count', ascending=False, inplace=True)
 
   ax = count_df.plot.bar(x='version', y='count',
-                         color=['#ff7f0e', '#1f77b4'], rot=0, figsize=standard_width)
-  add_labels_to_bars(ax, 26)
+                         color=['#1f77b4', '#ff7f0e'], rot=0, figsize=standard_width)
+  ax.yaxis.set_major_formatter(plt.FuncFormatter(y_formatter))
+  add_labels_to_bars(ax, 22, 4000)
 
   ax.get_legend().remove()
   plt.xlabel('NSEC version')
   plt.ylabel('Count [#]')
-  plt.title('NSEC Version Deployment across probed zones', loc='left')
+  # plt.title('NSEC Version Deployment across probed zones', loc='left')
   plot_or_show(output_path, 'nsec_deployment.pdf')
 
 
@@ -152,12 +161,12 @@ def plot_key_distribution(df, output_path):
   count_df.columns = ['num_zsk', 'num_ksk', 'count']
 
   count_df.plot.scatter(x='num_ksk', y='num_zsk',
-                        c='count', colormap='viridis', marker='s', s=50**2,
-                        figsize=(10, 8), norm=clrs.LogNorm())
-
+                        c='count', colormap='viridis', marker='s', s=(29.5)**2,
+                        figsize=(6, 4.8), norm=clrs.LogNorm())
+  plt.xticks(np.arange(min(count_df['num_ksk']), max(count_df['num_ksk'])+1, 1.0))
   plt.xlabel('Number of KSK [#]')
   plt.ylabel('Number of ZSK [#]')
-  plt.title('Distribution of keys', loc='left')
+  # plt.title('Distribution of keys', loc='left')
   plot_or_show(output_path, 'key_distribution.pdf')
 
 
@@ -169,12 +178,13 @@ def plot_deployment(df, output_path):
   count_df.sort_values(by='count', inplace=True, ascending=False)
 
   ax = count_df.plot.bar(x='validation_state', y='count',
-                         rot=0, figsize=standard_width)
-  add_labels_to_bars(ax, 7)
+                         rot=30, figsize=standard_width)
+  ax.yaxis.set_major_formatter(plt.FuncFormatter(y_formatter))
+  add_labels_to_bars(ax, 6, 4000)
 
   plt.xlabel('Result')
   plt.ylabel('Count [#]')
-  plt.title('Results of DNSSEC validation', loc='left')
+  # plt.title('Results of DNSSEC validation', loc='left')
   plot_or_show(output_path, 'dnssec_deployment.pdf')
 
 
@@ -203,11 +213,12 @@ def plot_partial_validations(df, output_path):
   partial_list = partial_df['count'].values
 
   ax = partial_df.plot.bar(rot=0, figsize=standard_width)
-  add_labels_to_bars(ax, 17, 0.1)
+  ax.yaxis.set_major_formatter(plt.FuncFormatter(y_formatter))
+  add_labels_to_bars(ax, 15, 0.1)
   ax.get_legend().remove()
   plt.xlabel('TLD')
   plt.ylabel('Count [#]')
-  plt.title('Partially Broken Chains', loc='left')
+  # plt.title('Partially Broken Chains', loc='left')
   plot_or_show(output_path, 'partial_dnssec_deployment.pdf')
 
   tlds = partial_df.index
@@ -228,11 +239,12 @@ def plot_partial_validations(df, output_path):
       {'partial': partial_list, 'unsecured': columns[1]}, index=tlds)
 
   ax = new_df.plot.bar(rot=0, figsize=standard_width, stacked=True)
-  add_labels_to_stacked_bars(ax, 17, 3)
+  ax.yaxis.set_major_formatter(plt.FuncFormatter(y_formatter))
+  add_labels_to_stacked_bars(ax, 15, 3)
 
   plt.xlabel('TLD')
   plt.ylabel('Count [#]')
-  plt.title('Partially Broken chains by zone', loc='left')
+  # plt.title('Partially Broken chains by zone', loc='left')
   plot_or_show(output_path, 'partial_dnssec_deployment_stacked.pdf')
 
 
