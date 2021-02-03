@@ -60,7 +60,6 @@ def add_labels_to_bars(ax, width, height_offset=1000):
 
 def plot_dnskey_algorithms(df, output_path):
   df.sort_values(by='count', inplace=True, ascending=False)
-
   ax = df.plot.pie(y='count', figsize=standard_width,
                    labels=df['name'], labeldistance=None, explode=[.05, .05, .05, .05, .05, .05, .05, .05], pctdistance=1.1, startangle=90)
   percent = 100.*df['count'].values/df['count'].values.sum()
@@ -153,6 +152,20 @@ def plot_nsec_version(df, output_path):
   # plt.title('NSEC Version Deployment across probed zones', loc='left')
   plot_or_show(output_path, 'nsec_deployment.pdf')
 
+  ax = count_df.plot.pie(y='count', figsize=standard_width,
+                         labels=count_df['version'], labeldistance=None, explode=[.05, .05], pctdistance=1.1, startangle=90)
+  percent = 100.*count_df['count'].values/count_df['count'].values.sum()
+  labels = ['{0} - {1:1.2f} %'.format(i, j)
+            for i, j in zip(count_df['version'], percent)]
+  patches, labels, dummy = zip(*sorted(zip(ax.patches, labels, count_df['count'].values),
+                                       key=lambda x: x[2],
+                                       reverse=True))
+  plt.legend(patches, labels, bbox_to_anchor=(.875, 0.5), loc='center right', bbox_transform=plt.gcf().transFigure,
+             fontsize=8, prop={'size': 10})
+  plt.ylabel('')
+  plt.tight_layout()
+  plot_or_show(output_path, 'nsec_deployment_pie.pdf')
+
 
 def plot_key_distribution(df, output_path):
   count_df = df.groupby(['num_ksk', 'num_zsk'], as_index=False).count()
@@ -163,7 +176,8 @@ def plot_key_distribution(df, output_path):
   count_df.plot.scatter(x='num_ksk', y='num_zsk',
                         c='count', colormap='viridis', marker='s', s=(29.5)**2,
                         figsize=(6, 4.8), norm=clrs.LogNorm())
-  plt.xticks(np.arange(min(count_df['num_ksk']), max(count_df['num_ksk'])+1, 1.0))
+  plt.xticks(np.arange(min(count_df['num_ksk']),
+                       max(count_df['num_ksk'])+1, 1.0))
   plt.xlabel('Number of KSK [#]')
   plt.ylabel('Number of ZSK [#]')
   # plt.title('Distribution of keys', loc='left')
