@@ -205,6 +205,12 @@ def plot_nsec_version(df, output_path):
   plt.tight_layout()
   plot_or_show(output_path, 'nsec_deployment_pie.pdf')
 
+  plt.legend(patches, labels, bbox_to_anchor=(1.05, 0.5), loc='center right', bbox_transform=plt.gcf().transFigure,
+             fontsize=12, prop={'size': 20})
+  plt.ylabel('')
+  plt.tight_layout()
+  plot_or_show(output_path, 'nsec_deployment_pie_large_legend.pdf')
+
 
 def plot_key_distribution(df, output_path):
   count_df = df.groupby(['num_ksk', 'num_zsk'], as_index=False).count()
@@ -229,9 +235,10 @@ def plot_deployment(df, output_path):
       ['validation_state', 'name']), 1, inplace=True)
   count_df.columns = ['validation_state', 'count']
   count_df.sort_values(by='count', inplace=True, ascending=False)
+  count_df.at[2, 'validation_state'] = 'INTERRUPTED_CHAIN'
 
   ax = count_df.plot.bar(x='validation_state', y='count',
-                         rot=30, figsize=standard_width)
+                         rot=20, figsize=standard_width)
   ax.yaxis.set_major_formatter(plt.FuncFormatter(y_formatter))
   ax.get_legend().remove()
   add_labels_to_bars(ax, 6, 4000)
